@@ -2,6 +2,7 @@
 import Image from "next/image";
 import React,{useEffect,useState} from "react";
 import V12 from "./V12";
+import V15 from "./V15";
 
 export default function Section_2() {
   const titleText = "Moon Light";
@@ -16,9 +17,14 @@ useEffect(() => {
   }, []);
   return (
     <div id="section1-container"> 
-     <div id="V12" style={{ padding: "20px 0 0 220px" ,textAlign:'center',fontWeight:'bold'}}>
+     <div id="V12" style={{ padding: "100px 20px 20px 20px" ,textAlign:'center',fontWeight:'bold'}}>
         <label>Section_1 - V12</label>
       <V12 />
+      </div>
+
+       <div id="V15" style={{ padding: "20px" ,textAlign:'center',fontWeight:'bold'}}>
+        <label>Section_1 - V15</label>
+      <V15 />
       </div>
     </div>
   );

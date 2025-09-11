@@ -3,39 +3,39 @@ import Head from 'next/head';
 
 const itemsRow = [
   {
-    title: 'Responsive Design',
+    title: 'Lorem Ipsum Dolor',
     copy:
-      'Beautiful, responsive UI that adapts to every device — designed with accessibility and readability in mind.',
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus lacinia odio vitae vestibulum vestibulum.',
     icon: 'image',
   },
   {
-    title: 'Endless Security Service',
+    title: 'Sit Amet Consectetur',
     copy:
-      'Robust, modern security practices to protect your data and provide peace of mind for users and admins.',
+      'Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation.',
     icon: 'lock',
   },
   {
-    title: 'Incredible Performance',
+    title: 'Adipiscing Elit',
     copy:
-      'Fast, optimized rendering and smart assets handling so pages feel instant and smooth for users.',
+      'Curabitur pretium tincidunt lacus. Nulla gravida orci a odio. Nullam varius, turpis et commodo pharetra.',
     icon: 'chart',
   },
   {
-    title: 'Customizable Components',
+    title: 'Integer Molestie',
     copy:
-      'Highly configurable building blocks so you can match your brand, behavior, and interaction patterns with minimal effort.',
+      'Praesent dapibus, neque id cursus faucibus, tortor neque egestas augue, eu vulputate magna eros eu erat.',
     icon: 'customize',
   },
   {
-    title: '24/7 Support & SLA',
+    title: 'Maecenas Viverra',
     copy:
-      'Reliable support and service-level commitments to keep your product running smoothly and customers happy around the clock.',
+      'Aliquam erat volutpat. Nam dui mi, tincidunt quis, accumsan porttitor, facilisis luctus, metus. Phasellus ultrices nulla quis nibh.',
     icon: 'support',
   },
   {
-    title: 'Advanced Analytics & Insights',
+    title: 'Vestibulum Ante',
     copy:
-      'Built-in metrics and analytics that help you measure engagement, performance, and the impact of UI changes over time.',
+      'Suspendisse potenti. In faucibus massa arcu, vitae cursus mi hendrerit nec. Quisque ut dolor gravida, placerat libero vel, euismod.',
     icon: 'analytics',
   },
 ];
@@ -136,7 +136,7 @@ export default function V12() {
     <>
       <Head>
         <title>Features — Modern UI</title>
-        <meta name="description" content="Feature grid with attractive UI, accessible and responsive." />
+        <meta name="description" content="Lorem ipsum dolor sit amet, consectetur adipiscing elit." />
         {/* NOTE: I removed the Google Fonts link to avoid imposing global fonts.
             Re-add font links here if you want to load them for this page. */}
       </Head>
@@ -156,11 +156,10 @@ export default function V12() {
           <div className="container mx-auto max-w-[1200px] z-10 w-full">
             <header className="lead text-center mb-9">
               <h1 id="features-heading" className="text-[34px] leading-tight text-[#271f32]">
-                Designed for people, built for performance
+                Lorem ipsum dolor sit amet
               </h1>
               <p className="lead-copy mx-auto max-w-[720px] text-[#6b6b6b] text-base leading-7">
-                A concise set of features that focus on usability, reliability, and visual polish — ready to drop into your
-                next project.
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero. Sed cursus ante dapibus diam.
               </p>
             </header>
 
