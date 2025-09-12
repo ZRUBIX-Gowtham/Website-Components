@@ -1,10 +1,7 @@
 'use client';
 
 import React, { useEffect,useState } from 'react';
-import V12 from './V12';
-import V15 from './V15';
-import V16 from './V16';
-import MobileV16 from './MobileV16';
+import V19 from './V19';
 
 export default function Section_2() {
 
@@ -21,8 +18,6 @@ export default function Section_2() {
     }
   }, []);
 
-  ///////////////////////////////
-  
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -50,28 +45,15 @@ export default function Section_2() {
 
 
   return (
-    <div id="section2-container">
-      <h2 style={{ textAlign: 'center', fontWeight: '700' }}>{titleText}</h2>
-      <section id="V12" style={{ padding: '100px 0 0 0', textAlign: 'center', fontWeight: 'bold' }}>
+    <div id="section6-container">
+      {/* <h2 style={{ textAlign: 'center', fontWeight: '700' }}>{titleText}</h2> */}
+      <section id="V19" style={{ padding: '100px', textAlign: 'center', fontWeight: 'bold' }}>
         <label>Section_2 - V12</label>
         <div>
-          <V12 />
-        </div>
-      </section>
-
-      <section id="V15" style={{ padding: '20px 0 0 0', textAlign: 'center', fontWeight: 'bold' }}>
-        <label>Section_2 - V15</label>
-        <div>
-          <V15 />
-        </div>
-      </section>
-
-      <section id="V16" style={{ padding: '20px 0 0 0', textAlign: 'center', fontWeight: 'bold' }}>
-        <label>Section_2 - V16</label>
-        <div>
-          {isMobile ? <MobileV16 /> : <V16/>}
+          <V19 />
         </div>
       </section>
     </div>
+    // {isMobile ? <MobileV16 /> : <V16/>}
   );
 }

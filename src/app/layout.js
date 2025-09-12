@@ -1,6 +1,6 @@
 // app/layout.js
 import './globals.css';
-import Navbar from './Sidebar';
+import Navbar from './Header';
 
 export const metadata = {
   title: 'My App',
