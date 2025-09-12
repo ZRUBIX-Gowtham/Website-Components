@@ -47,7 +47,7 @@ export default function Section_2() {
         </div>
       </section>
 
-       <section id="V26" style={{ padding: '20px 0 0 0', textAlign: 'center', fontWeight: 'bold' }}>
+       <section id="V26" style={{ padding: '20px 0 0px 0', textAlign: 'center', fontWeight: 'bold' }}>
         <label>Section_2 - V26</label>
         <div>
           <V26/>

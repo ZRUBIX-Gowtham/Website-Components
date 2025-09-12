@@ -47,7 +47,7 @@ export default function V16() {
 
   return (
     <div
-      className="min-h-screen p-6 relative"
+      className="min-h-screen p-6 py-20 relative"
       style={{ ...vars, background: "var(--bg)" }}
       aria-live="polite"
     >
