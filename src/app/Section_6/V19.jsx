@@ -5,17 +5,17 @@ import Link from "next/link";
 import Image from "next/image";
 
 const navLinks = [
-  { href: "#", label: "Home" },
-  { href: "#", label: "Products" },
-  { href: "#", label: "Pricing" },
-  { href: "#", label: "Docs" },
+  { href: "#", label: "Lorem" },
+  { href: "#", label: "Ipsum" },
+  { href: "#", label: "Dolor" },
+  { href: "#", label: "Sit" },
 ];
 
 const productsSubmenu = [
-  { href: "#", label: "Overview" },
-  { href: "#", label: "Features" },
-  { href: "#", label: "Integrations" },
-  { href: "#", label: "API" },
+  { href: "#", label: "Amet" },
+  { href: "#", label: "Consectetur" },
+  { href: "#", label: "Adipiscing" },
+  { href: "#", label: "Elit" },
 ];
 
 export default function V19() {
@@ -110,7 +110,7 @@ export default function V19() {
                 className="rounded-sm"
               />
               <span className={`font-semibold text-lg ${isDark ? "text-white" : "text-black"}`}>
-                YourBrand
+                Lorem Ipsum
               </span>
             </Link>
           </div>
@@ -118,7 +118,7 @@ export default function V19() {
           {/* Center: Nav (desktop) */}
           <nav className="hidden md:flex md:items-center md:gap-6" aria-label="Main navigation">
             {navLinks.map((link) => {
-              if (link.label === "Products") {
+              if (link.label === "Ipsum") { // Changed from "Products" to "Ipsum"
                 // Products item with submenu — wrapper covers both trigger & submenu
                 return (
                   <div
@@ -204,7 +204,7 @@ export default function V19() {
               </svg>
               <input
                 type="search"
-                placeholder="Search"
+                placeholder="Lorem Ipsum"
                 className={`bg-transparent outline-none text-sm ${inputText}`}
                 aria-label="Search"
               />
@@ -214,7 +214,7 @@ export default function V19() {
               href="#"
               className={`hidden sm:inline-block ${ctaBg} text-white text-sm px-4 py-2 rounded-md transition`}
             >
-              Get started
+              Lorem Ipsum
             </Link>
 
             <button

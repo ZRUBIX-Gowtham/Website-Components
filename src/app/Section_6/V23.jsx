@@ -5,29 +5,19 @@ import Link from "next/link";
 import Image from "next/image";
 
 const navLinks = [
-  { href: "#", label: "Home" },
-  { href: "#", label: "Products" },
-  { href: "#", label: "Pricing" },
-  { href: "#", label: "Docs" },
+  { href: "#", label: "Lipsum" },
+  { href: "#", label: "Lorem Ser" },
 ];
 
 const productsSubmenu = [
-  { href: "#", label: "Overview" },
-  { href: "#", label: "Features" },
-  { href: "#", label: "Integrations" },
-  { href: "#", label: "API" },
+  { href: "#", label: "Lorem ipsum dolor" },
+  { href: "#", label: "Dolor sit amet" },
 ];
 
-export default function V19() {
+export default function V23() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const userMenuRef = useRef(null);
-
-  // Desktop submenu (Products)
-  const [prodOpen, setProdOpen] = useState(false);
-
-  // Mobile submenu expansion
-  const [mobileProductsOpen, setMobileProductsOpen] = useState(false);
 
   // Theme state for header only: true = dark header, false = light header
   const [isDark, setIsDark] = useState(false);
@@ -72,17 +62,6 @@ export default function V19() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  // Close desktop submenu on Esc
-  useEffect(() => {
-    function onKey(e) {
-      if (e.key === "Escape") {
-        setProdOpen(false);
-      }
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
-
   // Header-only color helpers
   const headerBg = isDark ? "bg-black/95 text-white" : "bg-white/95 text-black";
   const headerBorder = isDark ? "border-gray-800" : "border-gray-200";
@@ -109,77 +88,51 @@ export default function V19() {
                 height={36}
                 className="rounded-sm"
               />
-              <span className={`font-semibold text-lg ${isDark ? "text-white" : "text-black"}`}>
-                YourBrand
-              </span>
+              <span className={`font-semibold text-lg ${isDark ? "text-white" : "text-black"}`}>Lorem ipsum</span>
             </Link>
           </div>
 
           {/* Center: Nav (desktop) */}
           <nav className="hidden md:flex md:items-center md:gap-6" aria-label="Main navigation">
-            {navLinks.map((link) => {
-              if (link.label === "Products") {
-                // Products item with submenu — wrapper covers both trigger & submenu
+            {navLinks.map((link, idx) => {
+              if (link.label === "Lorem Ser") {
+                // Using group to allow CSS-only show/hide of submenu on hover/focus
                 return (
-                  <div
-                    key={link.href}
-                    className="relative"
-                    onMouseEnter={() => setProdOpen(true)}
-                    onMouseLeave={() => setProdOpen(false)}
-                  >
+                  <div key={`nav-${idx}`} className="relative group">
                     <button
-                      onClick={() => setProdOpen((s) => !s)}
                       aria-haspopup="true"
-                      aria-expanded={prodOpen}
                       className={`flex items-center gap-1 text-sm px-2 py-1 rounded-md transition focus:outline-none focus:ring-2 focus:ring-indigo-500 ${navLinkBase}`}
-                      onFocus={() => setProdOpen(true)}
-                      onBlur={() => {
-                        // small timeout to allow focus to move into submenu links
-                        setTimeout(() => {
-                          const active = document.activeElement;
-                          // if focus is not in this menu, close
-                          if (!active || !(active instanceof Element) || !active.closest('.products-submenu')) {
-                            setProdOpen(false);
-                          }
-                        }, 10);
-                      }}
                     >
                       <span>{link.label}</span>
-                      <svg className={`w-4 h-4 transition-transform ${prodOpen ? "rotate-180" : "rotate-0"}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <svg className="w-4 h-4 transition-transform group-hover:rotate-180 group-focus:rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06-.02L10 10.66l3.71-3.47a.75.75 0 111.02 1.1l-4.22 3.95a.75.75 0 01-1.02 0L5.25 8.29a.75.75 0 01-.02-1.08z" clipRule="evenodd" />
                       </svg>
                     </button>
 
-                    {/* Submenu (desktop) — also keeps itself open while hovered */}
-                    {prodOpen && (
-                      <div
-                        className={`products-submenu absolute left-0 mt-1 w-40 ${submenuBg} border ${headerBorder} rounded-md shadow-lg py-2 text-sm ring-1 ring-black ring-opacity-5 z-50`}
-                        role="menu"
-                        aria-label="Products submenu"
-                        onMouseEnter={() => setProdOpen(true)}
-                        onMouseLeave={() => setProdOpen(false)}
-                      >
-                        {productsSubmenu.map((s, idx) => (
-                          <Link
-                            key={s.label + idx}
-                            href={s.href}
-                            className={`block px-4 py-2 ${submenuText}`}
-                            role="menuitem"
-                            onClick={() => setProdOpen(false)}
-                          >
-                            {s.label}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
+                    {/* Submenu (desktop) — shown via CSS on hover/focus */}
+                    <div
+                      className={`products-submenu absolute left-1/2 top-full -translate-x-1/2 mt-2 w-56 ${submenuBg} border ${headerBorder} rounded-md shadow-lg py-2 text-sm ring-1 ring-black ring-opacity-5 z-50 hidden group-hover:block group-focus-within:block`}
+                      role="menu"
+                      aria-label="Lorem Ser submenu"
+                    >
+                      {productsSubmenu.map((s, j) => (
+                        <Link
+                          key={`prod-${j}`}
+                          href={s.href}
+                          className={`block px-4 py-2 text-center ${submenuText}`}
+                          role="menuitem"
+                        >
+                          {s.label}
+                        </Link>
+                      ))}
+                    </div>
                   </div>
                 );
               }
 
-              // regular nav items
               return (
                 <Link
-                  key={link.href + link.label}
+                  key={`nav-${idx}`}
                   href={link.href}
                   className={`text-sm px-2 py-1 rounded-md transition ${navLinkBase}`}
                 >
@@ -193,43 +146,128 @@ export default function V19() {
           <div className="flex items-center gap-3">
             {/* optional search - hide on small screens */}
             <div className={`hidden md:flex items-center ${searchBg} px-2 py-1 rounded-md`}>
-              <svg
-                className={`w-4 h-4 mr-2 ${isDark ? "text-gray-300" : "text-gray-500"}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
+              <svg className={`w-4 h-4 mr-2 ${isDark ? "text-gray-300" : "text-gray-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
               </svg>
-              <input
-                type="search"
-                placeholder="Search"
-                className={`bg-transparent outline-none text-sm ${inputText}`}
-                aria-label="Search"
-              />
+              <input type="search" placeholder="Search Lorem Ser..." className={`bg-transparent outline-none text-sm ${inputText}`} aria-label="Search" />
             </div>
 
-            <Link
-              href="#"
-              className={`hidden sm:inline-block ${ctaBg} text-white text-sm px-4 py-2 rounded-md transition`}
-            >
-              Get started
+            <Link href="#" className={`hidden sm:inline-block ${ctaBg} text-white text-sm px-4 py-2 rounded-md transition`}>
+              Explore Now
             </Link>
 
             <button
               onClick={toggleTheme}
               aria-pressed={isDark}
               aria-label="Toggle header dark / light"
-              className={`flex items-center justify-center w-10 h-10 rounded-md border ${isDark ? "border-gray-700 bg-black/60" : "border-gray-200 bg-white/60"} transition focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+              className={`hidden md:flex items-center justify-center w-10 h-10 rounded-md border ${isDark ? "border-gray-700 bg-black/60" : "border-gray-200 bg-white/60"} transition focus:outline-none focus:ring-2 focus:ring-indigo-500`}
             >
               {isDark ? (
-                // Moon icon (dark active)
                 <svg className="w-5 h-5 text-yellow-300" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
                 </svg>
               ) : (
-                // Sun icon (light active)
+                <svg className="w-5 h-5 text-yellow-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12 4.5a1 1 0 011 1V7a1 1 0 11-2 0V5.5a1 1 0 011-1zm0 11a4 4 0 100-8 4 4 0 000 8zM4.5 12a1 1 0 011-1H7a1 1 0 110 2H5.5a1 1 0 01-1-1zm11 0a1 1 0 011-1H19a1 1 0 110 2h-1.5a1 1 0 01-1-1zM6.22 6.22a1 1 0 011.42 0l.88.88a1 1 0 01-1.42 1.42l-.88-.88a1 1 0 010-1.42zM15.48 15.48a1 1 0 011.42 0l.88.88a1 1 0 01-1.42 1.42l-.88-.88a1 1 0 010-1.42zM6.22 17.78a1 1 0 010-1.42l.88-.88a1 1 0 111.42 1.42l-.88.88a1 1 0 01-1.42 0zM15.48 8.52a1 1 0 010-1.42l.88-.88a1 1 0 111.42 1.42l-.88.88a1 1 0 01-1.42 0z" />
+                </svg>
+              )}
+            </button>
+
+            {/* Mobile menu button */}
+            <button
+              type="button"
+              className={`md:hidden flex items-center justify-center w-10 h-10 rounded-md border ${isDark ? "border-gray-700 bg-black/60" : "border-gray-200 bg-white/60"} transition focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+              aria-controls="mobile-menu"
+              aria-expanded={mobileOpen}
+              onClick={() => setMobileOpen(!mobileOpen)}
+            >
+              <span className="sr-only">Open main menu</span>
+              {mobileOpen ? (
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile menu (expanded) */}
+      {mobileOpen && (
+        <div className={`md:hidden ${submenuBg} border-t ${headerBorder}`} id="mobile-menu">
+          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+            {navLinks.map((link, idx) => {
+              if (link.label === "Lorem Ser") {
+                return (
+                  <div key={`mobile-nav-${idx}`}>
+                    {/* native disclosure widget — no React state needed */}
+                    <details className="group">
+                      <summary
+                        className={`flex items-center justify-between w-full px-3 py-2 rounded-md text-base font-medium ${navLinkBase} cursor-pointer list-none`}
+                      >
+                        <span className="text-center w-full">{link.label}</span>
+                        <svg className="w-4 h-4 transition-transform group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06-.02L10 10.66l3.71-3.47a.75.75 0 111.02 1.1l-4.22 3.95a.75.75 0 01-1.02 0L5.25 8.29a.75.75 0 01-.02-1.08z" clipRule="evenodd" />
+                        </svg>
+                      </summary>
+
+                      <div className="pl-5 pr-3 py-1 space-y-1">
+                        {productsSubmenu.map((s, j) => (
+                          <Link
+                            key={`mobile-prod-${j}`}
+                            href={s.href}
+                            className={`block px-3 py-2 rounded-md text-base font-medium text-center ${submenuText}`}
+                            onClick={() => setMobileOpen(false)}
+                          >
+                            {s.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </details>
+                  </div>
+                );
+              }
+              return (
+                <Link
+                  key={`mobile-nav-${idx}`}
+                  href={link.href}
+                  className={`block px-3 py-2 rounded-md text-base font-medium ${navLinkBase}`}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+            <div className="py-2">
+              <Link
+                href="#"
+                className={`block w-full text-center ${ctaBg} text-white text-base font-medium px-4 py-2 rounded-md transition`}
+                onClick={() => setMobileOpen(false)}
+              >
+                Lorem ipsum
+              </Link>
+            </div>
+            <div className={`flex items-center ${searchBg} px-3 py-2 rounded-md w-full`}>
+              <svg className={`w-5 h-5 mr-2 ${isDark ? "text-gray-300" : "text-gray-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+              </svg>
+              <input type="search" placeholder="Lorem Ser..." className={`bg-transparent outline-none text-base ${inputText}`} aria-label="Search" />
+            </div>
+            <button
+              onClick={toggleTheme}
+              aria-pressed={isDark}
+              aria-label="Toggle header dark / light"
+              className={`flex items-center justify-center w-full h-10 rounded-md border ${isDark ? "border-gray-700 bg-black/60" : "border-gray-200 bg-white/60"} transition focus:outline-none focus:ring-2 focus:ring-indigo-500 mt-2`}
+            >
+              {isDark ? (
+                <svg className="w-5 h-5 text-yellow-300" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+                </svg>
+              ) : (
                 <svg className="w-5 h-5 text-yellow-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M12 4.5a1 1 0 011 1V7a1 1 0 11-2 0V5.5a1 1 0 011-1zm0 11a4 4 0 100-8 4 4 0 000 8zM4.5 12a1 1 0 011-1H7a1 1 0 110 2H5.5a1 1 0 01-1-1zm11 0a1 1 0 011-1H19a1 1 0 110 2h-1.5a1 1 0 01-1-1zM6.22 6.22a1 1 0 011.42 0l.88.88a1 1 0 01-1.42 1.42l-.88-.88a1 1 0 010-1.42zM15.48 15.48a1 1 0 011.42 0l.88.88a1 1 0 01-1.42 1.42l-.88-.88a1 1 0 010-1.42zM6.22 17.78a1 1 0 010-1.42l.88-.88a1 1 0 111.42 1.42l-.88.88a1 1 0 01-1.42 0zM15.48 8.52a1 1 0 010-1.42l.88-.88a1 1 0 111.42 1.42l-.88.88a1 1 0 01-1.42 0z" />
                 </svg>
@@ -237,7 +275,7 @@ export default function V19() {
             </button>
           </div>
         </div>
-      </div>
+      )}
     </header>
   );
 }
