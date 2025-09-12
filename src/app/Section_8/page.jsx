@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useEffect,useState } from 'react';
-import V19 from './V19';
-import V23 from '../Section_8/V23';
+import V23 from './V23';
 
 export default function Section_2() {
 
@@ -19,17 +18,16 @@ export default function Section_2() {
     }
   }, []);
 
+  ///////////////////////////////
   return (
-    <div id="section6-container">
-      {/* <h2 style={{ textAlign: 'center', fontWeight: '700' }}>{titleText}</h2> */}
-    
-      <section id="V19" style={{ padding: '100px 20px 0 20px', textAlign: 'center', fontWeight: 'bold' }}>
-        <label>Section_2 - V19</label>
+    <div id="section2-container">
+      <h2 style={{ textAlign: 'center', fontWeight: '700' }}>{titleText}</h2>
+      <section id="V12" style={{ padding: '100px 0 0 0', textAlign: 'center', fontWeight: 'bold' }}>
+        <label>Section_2 - V12</label>
         <div>
-          <V19 />
+          <V23 />
         </div>
       </section>
-
     </div>
   );
 }
