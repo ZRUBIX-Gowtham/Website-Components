@@ -8,7 +8,7 @@ const MENU = [
   { label: 'Home', href: '/' },
   {
     label: 'Section 1-15',
-    href: '', // empty -> treated as no link
+    href: '',
     submenu: [
       { label: 'Section 1', href: '/Section_1' },
       { label: 'Section 2', href: '/Section_2' },
@@ -27,9 +27,9 @@ const MENU = [
       { label: 'Section 15', href: '/Section_12' },
     ],
   },
-   {
+  {
     label: 'Section 16-30',
-    href: '', // empty -> treated as no link
+    href: '',
     submenu: [
       { label: 'Section 11', href: '/Section_1' },
       { label: 'Section 12', href: '/Section_2' },
@@ -50,8 +50,8 @@ const MENU = [
   },
 ];
 
-const OPEN_DELAY = 80;   // ms before opening submenu (small)
-const CLOSE_DELAY = 260; // ms before closing submenu (prevents accidental hide)
+const OPEN_DELAY = 80;   // ms before opening submenu
+const CLOSE_DELAY = 260; // ms before closing submenu
 
 const Navbar = () => {
   const [openIndex, setOpenIndex] = useState(null);
@@ -65,7 +65,10 @@ const Navbar = () => {
     };
   }, []);
 
+  const hasHref = (href) => !!href && href.trim() !== '';
+
   const handleMouseEnter = (i) => {
+    // entering either the trigger or submenu cancels close timer and starts open timer
     if (closeTimer.current) {
       clearTimeout(closeTimer.current);
       closeTimer.current = null;
@@ -77,14 +80,16 @@ const Navbar = () => {
     }, OPEN_DELAY);
   };
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = (i = null) => {
+    // leaving either the trigger or submenu starts the close timer;
+    // only close if the currently open menu matches (prevents cross-closing)
     if (openTimer.current) {
       clearTimeout(openTimer.current);
       openTimer.current = null;
     }
     if (closeTimer.current) clearTimeout(closeTimer.current);
     closeTimer.current = setTimeout(() => {
-      setOpenIndex(null);
+      setOpenIndex((prev) => (i === null || prev === i ? null : prev));
       closeTimer.current = null;
     }, CLOSE_DELAY);
   };
@@ -98,11 +103,8 @@ const Navbar = () => {
       clearTimeout(closeTimer.current);
       closeTimer.current = null;
     }
-    setOpenIndex(openIndex === i ? null : i);
+    setOpenIndex((prev) => (prev === i ? null : i));
   };
-
-  // Helper to tell if href should be treated as a link
-  const hasHref = (href) => !!href && href.trim() !== '';
 
   return (
     <header className="w-full bg-gray-900 text-white fixed top-0 left-0 z-[1000]">
@@ -116,16 +118,25 @@ const Navbar = () => {
             const isOpen = openIndex === i;
             const itemHasHref = hasHref(item.href);
 
+            // Submenu classes now entirely controlled by isOpen
+            const submenuClass = [
+              'submenu absolute left-0 top-[calc(100%+6px)] bg-[#0b1220] min-w-[180px] rounded-lg py-[8px] list-none m-0 z-50',
+              'shadow-[0_6px_18px_rgba(2,6,23,0.6)]',
+              'transform origin-top transition-[opacity,transform] duration-[120ms]',
+              isOpen
+                ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
+                : 'pointer-events-none opacity-0 -translate-y-[6px] scale-[0.98]',
+            ].join(' ');
+
             return (
               <li
                 key={`${i}-${item.label}`}
-                className={`nav-item relative ${item.submenu ? 'group' : ''} ${isOpen ? 'open' : ''}`}
+                className={`nav-item relative ${isOpen ? 'open' : ''}`}
                 onMouseEnter={() => item.submenu && handleMouseEnter(i)}
-                onMouseLeave={() => item.submenu && handleMouseLeave()}
+                onMouseLeave={() => item.submenu && handleMouseLeave(i)}
               >
                 <div
                   className="nav-link inline-flex items-center gap-[8px] px-[12px] py-[8px] rounded-[6px] text-gray-200 cursor-pointer"
-                  // If item has no link but has submenu, make it tabbable/clickable
                   onClick={() => item.submenu && toggleSubmenu(i)}
                   role={item.submenu ? 'button' : undefined}
                   tabIndex={item.submenu ? 0 : undefined}
@@ -137,11 +148,12 @@ const Navbar = () => {
                       toggleSubmenu(i);
                     }
                   }}
+                  onFocus={() => item.submenu && handleMouseEnter(i)}
+                  onBlur={() => item.submenu && handleMouseLeave(i)}
                 >
                   {itemHasHref ? (
                     <Link href={item.href} className="text-inherit no-underline">{item.label}</Link>
                   ) : (
-                    // no href => render a non-link label
                     <span className="nav-label text-inherit text-[15px]">{item.label}</span>
                   )}
                   {item.submenu && <span className="caret text-[12px] opacity-80">▾</span>}
@@ -149,18 +161,10 @@ const Navbar = () => {
 
                 {item.submenu && (
                   <ul
-                    className={[
-                      // base styles
-                      'submenu absolute left-0 top-[calc(100%+8px)] bg-[#0b1220] min-w-[180px] rounded-lg py-[8px] list-none m-0 z-50',
-                      'shadow-[0_6px_18px_rgba(2,6,23,0.6)]',
-                      'transform origin-top transition-[opacity,transform] duration-[120ms]',
-                      'pointer-events-none opacity-0 -translate-y-[6px] scale-[0.98]',
-                      // hover (group) to open
-                      'group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100 group-hover:pointer-events-auto',
-                      // if state-open -> visible
-                      isOpen ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : '',
-                    ].join(' ')}
+                    className={submenuClass}
                     aria-hidden={!isOpen}
+                    onMouseEnter={() => handleMouseEnter(i)}
+                    onMouseLeave={() => handleMouseLeave(i)}
                   >
                     {item.submenu.map((sub, j) => {
                       const subHasHref = hasHref(sub.href);
@@ -184,7 +188,7 @@ const Navbar = () => {
         </ul>
       </nav>
 
-      {/* Small global styles to precisely match the original media query at max-width:720px */}
+      {/* Small global styles for <=720px */}
       <style jsx global>{`
         @media (max-width: 720px) {
           .navbar { padding: 10px 12px; }
