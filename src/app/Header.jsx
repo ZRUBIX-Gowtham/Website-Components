@@ -19,7 +19,8 @@ const MENU = [
     label: 'Section 16-30',
     href: '',
     submenu: [
-      { label: 'Section 11', href: '/Section_1' },
+      { label: 'Section 15', href: '/Section_15' },
+      { label: 'Section 16', href: '/Section_16' },
     ],
   },
 ];
