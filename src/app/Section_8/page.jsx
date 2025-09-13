@@ -2,6 +2,7 @@
 
 import React, { useEffect,useState } from 'react';
 import V23 from './V23';
+import V37 from './V37';
 
 export default function Section_2() {
 
@@ -20,12 +21,20 @@ export default function Section_2() {
 
   ///////////////////////////////
   return (
-    <div id="section2-container">
+    <div id="section8-container">
       <h2 style={{ textAlign: 'center', fontWeight: '700' }}>{titleText}</h2>
-      <section id="V12" style={{ padding: '100px 0 0 0', textAlign: 'center', fontWeight: 'bold' }}>
-        <label>Section_2 - V12</label>
+      <section id="V23" style={{ padding: '100px 0 0 0', textAlign: 'center', fontWeight: 'bold' }}>
+        <label>Section_8 - V23</label>
         <div>
           <V23 />
+        </div>
+      </section>
+
+
+      <section id="V37" style={{ padding: '100px 0 0 0', textAlign: 'center', fontWeight: 'bold' }}>
+        <label>Section_8 - V37</label>
+        <div>
+          <V37 />
         </div>
       </section>
     </div>
