@@ -20,7 +20,14 @@ const MENU = [
     href: '',
     submenu: [
       { label: 'Section 15', href: '/Section_15' },
-      { label: 'Section 16', href: '/Section_16' },
+      { label: 'Section 18', href: '/Section_18' },
+    ],
+  },
+  {
+    label: 'Section 31-45',
+    href: '',
+    submenu: [
+      { label: 'Section 31', href: '/Section_31' },
     ],
   },
 ];

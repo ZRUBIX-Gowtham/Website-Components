@@ -2,6 +2,7 @@
 
 import React, { useEffect,useState } from 'react';
 import V38 from './V38';
+import V42 from './V42';
 
 export default function Section_2() {
 
@@ -26,6 +27,13 @@ export default function Section_2() {
         <label>Section_15 - V38</label>
         <div>
           <V38 />
+        </div>
+      </section>
+
+      <section id="V42" style={{ padding: '100px 0 0 0', textAlign: 'center', fontWeight: 'bold' }}>
+        <label>Section_15 - V42</label>
+        <div>
+          <V42 />
         </div>
       </section>
     </div>
