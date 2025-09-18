@@ -7,10 +7,12 @@ import V33 from './V33';
 import V50 from './V50';
 import V37 from './V37';
 import V47 from './V47';
+import V151 from './V151 Web';
+import V152 from './V152 mobile';
 
 export default function Section_2() {
 
-  const titleText = 'Moon Light';
+  const titleText = '';
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -66,6 +68,20 @@ export default function Section_2() {
         <label>Section_6 - V50</label>
         <div>
           <V50 />
+        </div>
+      </section>
+
+       <section id="V151" style={{ padding: '100px 0px 100px 0px', textAlign: 'center', fontWeight: 'bold' }}>
+        <label>Section_6 - V151</label>
+        <div>
+          {/* <V151 /> */}
+        </div>
+      </section>
+
+      <section id="V152" style={{ padding: '100px 0px 100px 0px', textAlign: 'center', fontWeight: 'bold' }}>
+        <label>Section_6 - V151</label>
+        <div>
+          {/* <V152 /> */}
         </div>
       </section>
 

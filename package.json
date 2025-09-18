@@ -9,6 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.0.1",
+    "@fortawesome/fontawesome-svg-core": "^7.0.1",
+    "@fortawesome/free-brands-svg-icons": "^7.0.1",
+    "@fortawesome/free-solid-svg-icons": "^7.0.1",
+    "@fortawesome/react-fontawesome": "^3.0.2",
     "@react-spring/three": "^10.0.2",
     "@react-three/drei": "^10.7.6",
     "@react-three/fiber": "^9.3.0",
