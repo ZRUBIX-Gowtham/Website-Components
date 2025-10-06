@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>SVG Compressor — Light Theme</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{
+      --bg:#f6f7fb; --card:#ffffff; --muted:#6b7280; --accent:#2563eb; --accent-2:#06b6d4; --text:#0f1724;
+      --success:#16a34a;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background:linear-gradient(180deg,#eef2ff 0%, #f8fafc 100%);
+      color:var(--text);
+      min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+    }
+    .card{ width:840px; max-width:96%; background:var(--card); border-radius:12px; padding:18px; box-shadow:0 6px 22px rgba(16,24,40,0.06); border:1px solid rgba(15,23,42,0.04);}
+    h3{margin:0 0 10px 0; font-size:18px;}
+    .row{display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px;}
+    label{font-size:13px; color:var(--muted);}
+    input[type=file]{padding:8px;}
+    select,input[type=number]{padding:8px 10px; border-radius:8px; border:1px solid #e6e9ef; background:transparent; color:var(--text); min-width:120px;}
+    button{background:var(--accent); color:#fff; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:600;}
+    button[disabled]{opacity:0.5; cursor:not-allowed;}
+    .small{font-size:13px; color:var(--muted);}
+    .progress{height:10px; background:#eef2ff; border-radius:999px; overflow:hidden; width:100%; border:1px solid rgba(37,99,235,0.06);}
+    .bar{height:100%; background:linear-gradient(90deg,var(--accent), var(--accent-2)); width:0%; transition:width .25s ease;}
+    .stats{display:flex; gap:12px; flex-wrap:wrap; margin-top:12px;}
+    .stat{flex:1; min-width:160px; background:#fbfdff; border-radius:8px; padding:10px; border:1px solid #f1f5f9;}
+    .stat b{display:block; font-size:14px; margin-bottom:6px;}
+    .note{margin-top:12px; font-size:13px; color:var(--muted);}
+    .controls{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+    .toggle{display:flex; align-items:center; gap:8px;}
+    input[type=checkbox]{width:18px;height:18px;}
+  </style>
+</head>
+<body>
+  <div class="card" role="main" aria-live="polite">
+    <h3>SVG Compressor — Light</h3>
+    <div class="row">
+      <input id="file" type="file" accept=".svg" />
+      <div class="controls">
+        <label class="small">Target reduction</label>
+        <select id="target">
+          <option value="70" selected>70%</option>
+          <option value="60">60%</option>
+          <option value="50">50%</option>
+        </select>
+      </div>
+      <div class="controls">
+        <label class="small">Start precision</label>
+        <select id="startPrecision">
+          <option value="4">4 decimals</option>
+          <option value="3" selected>3 decimals</option>
+          <option value="2">2 decimals</option>
+        </select>
+      </div>
+
+      <div class="toggle small">
+        <input id="aggressive" type="checkbox" checked />
+        <label for="aggressive">Aggressive (may change visuals minutely)</label>
+      </div>
+
+      <button id="compressBtn">Compress</button>
+      <button id="downloadBtn" disabled>Download .svg</button>
+    </div>
+
+    <div class="row">
+      <div style="flex:1">
+        <div class="progress" title="progress"><div id="bar" class="bar"></div></div>
+      </div>
+      <div style="width:260px; text-align:right" class="small" id="status">No file selected</div>
+    </div>
+
+    <div class="stats" id="statsArea" aria-hidden="true" style="display:none">
+      <div class="stat">
+        <b>Original size</b>
+        <div id="origSize">—</div>
+      </div>
+      <div class="stat">
+        <b>Optimized size</b>
+        <div id="optSize">—</div>
+      </div>
+      <div class="stat">
+        <b>Reduction</b>
+        <div id="reduction">—</div>
+      </div>
+    </div>
+
+    <div class="note" id="details">Choose an SVG and click Compress. The tool runs lossless + safe lossy optimizations. It may not reach the exact target for all files (embedded images or already-optimized SVGs are harder to shrink).</div>
+  </div>
+
+  <script>
+    // Utilities
+    const $ = id => document.getElementById(id);
+    const fileInput = $('file'), compressBtn = $('compressBtn'), downloadBtn = $('downloadBtn');
+    const status = $('status'), bar = $('bar');
+    const origSizeEl = $('origSize'), optSizeEl = $('optSize'), reductionEl = $('reduction'), statsArea = $('statsArea');
+    let lastOptimizedText = null, lastFilename = null;
+
+    function bytesOf(s){ return (new TextEncoder().encode(s)).length; }
+    function setProgress(p, text){ bar.style.width = Math.max(0, Math.min(100, p)) + '%'; if(text) status.textContent = text; }
+
+    // Protect segments (data:, CDATA, script/style content) from numeric/path edits
+    function protectSegments(svgText){
+      const tokens = [];
+      let idx=0;
+      // data: URLs
+      svgText = svgText.replace(/data:[^"'>)\s]+/g, m => {
+        const t = `__DATA_${idx}__`; tokens.push({t, v:m}); idx++; return t;
+      });
+      // CDATA
+      svgText = svgText.replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, m => { const t=`__CDATA_${idx}__`; tokens.push({t,v:m}); idx++; return t; });
+      // <style> contents
+      svgText = svgText.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (m, css) => {
+        const t=`__STYLE_${idx}__`; tokens.push({t, v:css}); idx++; return m.replace(css, t);
+      });
+      return {text:svgText, tokens};
+    }
+    function restoreSegments(text, tokens){
+      tokens.forEach(tk => text = text.split(tk.t).join(tk.v));
+      return text;
+    }
+
+    // Basic safe minification (lossless)
+    function basicMinify(svg){
+      svg = svg.replace(/<\?xml[\s\S]*?\?>\s*/g,'');               // remove XML prolog
+      svg = svg.replace(/<!--[\s\S]*?-->/g,'');                   // remove comments
+      svg = svg.replace(/<(title|desc|metadata)[\s\S]*?<\/\1>/gi,''); // remove metadata elements
+      svg = svg.replace(/\s+(inkscape|sodipodi|xmlns:inkscape|xmlns:sodipodi)="[^"]*"/gi,''); // remove editor attrs
+      svg = svg.replace(/\s{2,}/g,' ');                           // collapse multiple spaces
+      svg = svg.replace(/>\s+</g,'><');                           // collapse inter-tag whitespace
+      svg = svg.trim();
+      return svg;
+    }
+
+    // Shorten hex colors (#rrggbb -> #rgb)
+    function shortenHexColors(text){
+      return text.replace(/#([0-9a-fA-F])\1([0-9a-fA-F])\2([0-9a-fA-F])\3/g, '#$1$2$3');
+    }
+
+    // Minify <style> blocks (we preserved content in tokens; shorten when restoring)
+    function minifyStyle(css){
+      // remove comments, unneeded spaces
+      return css.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\s*([:;{},])\s*/g,'$1').replace(/\s+/g,' ').trim();
+    }
+
+    // Remove unused ids when safe
+    function removeUnusedIds(svgText){
+      const ids = [...svgText.matchAll(/\sid="([^"]+)"/g)].map(m=>m[1]);
+      if(!ids.length) return svgText;
+      const used = new Set();
+      ids.forEach(id=>{
+        const re = new RegExp(`url\\(#${escapeRegExp(id)}\\)|['"]#${escapeRegExp(id)}['"]|href=[\\"']#${escapeRegExp(id)}[\\'"]|xlink:href=[\\"']#${escapeRegExp(id)}[\\'"]`, 'g');
+        if(re.test(svgText)) used.add(id);
+      });
+      ids.forEach(id=>{
+        if(!used.has(id)){
+          svgText = svgText.replace(new RegExp(`\\s+id="${escapeRegExp(id)}"`, 'g'), '');
+        }
+      });
+      return svgText;
+    }
+
+    function escapeRegExp(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+
+    // Round numbers to a given precision (safe)
+    function roundNumbers(text, precision){
+      if(precision < 0) return text;
+      const factor = Math.pow(10, precision);
+      return text.replace(/-?\d+\.\d+/g, numStr => {
+        const n = Number(numStr);
+        if(!isFinite(n)) return numStr;
+        let v = Math.round(n * factor) / factor;
+        if(Object.is(v, -0)) v = 0;
+        let s = String(v);
+        if(s.indexOf('.') >= 0) s = s.replace(/\.?0+$/,'');
+        return s;
+      });
+    }
+
+    // Path data shortening (safe-ish): remove redundant spaces, leading zeros, remove zero-length commands, remove commas
+    function shortenPathData(text, aggressive){
+      // Apply to 'd' attributes only
+      return text.replace(/d="([^"]*)"/gi, (m, d) => {
+        let s = d;
+        // remove commas
+        s = s.replace(/,/g, ' ');
+        // remove extra spaces
+        s = s.replace(/\s+/g, ' ');
+        // remove spaces after command letters: "M 10 10" -> "M10 10"
+        s = s.replace(/([a-zA-Z])\s+/g, '$1');
+        // convert 0.500 -> .5 (leading zero removal) safely
+        s = s.replace(/(^|[\s,])0+\.([0-9]+)/g, '$1.$2');
+        // remove "+", normalize "-0" -> "0"
+        s = s.replace(/\+?/g, match => match==='+'? '' : match).replace(/\-0(\D|$)/g, '0$1');
+        // remove unnecessary ".0" endings
+        s = s.replace(/\.0+([,\s]|$)/g, '$1');
+        // remove explicit zeros in relative lineto "l0 0" or "L0 0" if they are redundant; aggressive only
+        if(aggressive){
+          s = s.replace(/([lL])0\s+0(?=[\sA-Za-z]|$)/g, ''); // drop l0 0
+          // also collapse repeats of commands like "m0 0"?
+        }
+        // trim
+        s = s.trim();
+        return `d="${s}"`;
+      });
+    }
+
+    // Further safe attr cleanups (remove empty groups, display:none elements)
+    function removeHiddenElements(text){
+      // remove elements with display:none or visibility:hidden (entire element)
+      text = text.replace(/<([^>\s]+)[^>]*\b(style|display|visibility)[^>]*?(display:\s*none|visibility:\s*hidden)[^>]*>[\s\S]*?<\/\1>/gi, '');
+      // remove attributes like style="display:none"
+      text = text.replace(/\sstyle="[^"]*(display:\s*none|visibility:\s*hidden)[^"]*"/gi, '');
+      return text;
+    }
+
+    // Remove redundant attributes that are default or empty
+    function stripEmptyAttrs(text){
+      text = text.replace(/\s+\w+="\s*"/g,''); // remove empty attributes
+      text = text.replace(/\s+(stroke-width|fill-opacity|stroke-opacity)="1"/gi,''); // common defaults (be careful)
+      return text;
+    }
+
+    // single optimize pass for a precision and aggressive flag
+    function optimizePass(svgText, precision, aggressive){
+      const {text:protectText, tokens} = protectSegments(svgText);
+      let t = protectText;
+      t = basicMinify(t);
+      t = removeHiddenElements(t);
+      t = stripEmptyAttrs(t);
+      t = shortenHexColors(t);
+      t = roundNumbers(t, precision);
+      t = removeUnusedIds(t);
+      t = shortenPathData(t, aggressive);
+      t = t.replace(/>\s+</g,'><').trim();
+      // restore style tokens but minify them
+      let restored = restoreSegments(t, tokens);
+      // replace style tokens with minified string if present
+      restored = restored.replace(/__STYLE_(\d+)__/g, (m, idx) => {
+        const token = tokens.find(x => x.t === m);
+        if(!token) return m;
+        return minifyStyle(token.v || '');
+      });
+      return restored;
+    }
+
+    // Iterative compressor aiming for target reduction
+    async function compress(svgText, startPrecision, targetPercent, aggressive){
+      const origBytes = bytesOf(svgText);
+      let best = {text:svgText, bytes:origBytes, reduction:0, precision:null};
+      const precisions = [];
+      for(let p=startPrecision; p>=0; --p) precisions.push(p);
+
+      for(let i=0;i<precisions.length;i++){
+        const p = precisions[i];
+        setProgress( (i/precisions.length)*80, `Precision ${p}...` );
+        await new Promise(r=>setTimeout(r, 10));
+        try {
+          const out = optimizePass(svgText, p, aggressive);
+          const b = bytesOf(out);
+          const reduction = Math.round((1 - b / origBytes) * 100);
+          if(reduction > best.reduction){
+            best = {text:out, bytes:b, reduction, precision:p};
+          }
+          if(reduction >= targetPercent){
+            setProgress(90 + Math.random()*10, `Target ${targetPercent}% reached (precision ${p})`);
+            return {result:out, originalBytes:origBytes, outBytes:b, reduction, precision:p, success:true};
+          }
+        } catch(err){
+          console.error('optimize error', err);
+        }
+      }
+
+      // final lossless squeeze
+      setProgress(90, 'Final lossless squeeze...');
+      await new Promise(r=>setTimeout(r,50));
+      const final = best.text.replace(/\s+/g,' ').replace(/>\s+</g,'><').trim();
+      const finalBytes = bytesOf(final);
+      const finalReduction = Math.round((1 - finalBytes / origBytes) * 100);
+      if(finalReduction > best.reduction) best = {text:final, bytes:finalBytes, reduction:finalReduction, precision:best.precision};
+      setProgress(100, `Done — best ${best.reduction}%`);
+      return {result:best.text, originalBytes:origBytes, outBytes:best.bytes, reduction:best.reduction, precision:best.precision, success:false};
+    }
+
+    // UI wiring
+    fileInput.addEventListener('change', ()=>{
+      if(!fileInput.files || fileInput.files.length===0){ status.textContent='No file selected'; setProgress(0); return; }
+      const f = fileInput.files[0];
+      status.textContent = `${f.name} — ${Math.round(f.size/1024)} KB`;
+      setProgress(0);
+      downloadBtn.disabled = true;
+      statsArea.style.display = 'none';
+    });
+
+    compressBtn.addEventListener('click', async ()=>{
+      if(!fileInput.files || fileInput.files.length===0){ alert('Please select an .svg file'); return; }
+      const f = fileInput.files[0];
+      if(!f.name.toLowerCase().endsWith('.svg')){ alert('Please provide a .svg file'); return; }
+      lastFilename = f.name.replace(/\.svg$/i,'') + '.min.svg';
+      setProgress(5, 'Reading file...');
+      const text = await f.text();
+      const target = Number($('target').value) || 70;
+      const startPrecision = Number($('startPrecision').value) || 3;
+      const aggressive = $('aggressive').checked;
+      setProgress(10, 'Optimizing...');
+      const start = performance.now();
+      const res = await compress(text, startPrecision, target, aggressive);
+      const elapsed = Math.round(performance.now() - start);
+      lastOptimizedText = res.result;
+      downloadBtn.disabled = false;
+      statsArea.style.display = 'flex';
+      origSizeEl.textContent = `${res.originalBytes} bytes (${Math.round(res.originalBytes/1024)} KB)`;
+      optSizeEl.textContent = `${res.outBytes} bytes (${Math.round(res.outBytes/1024)} KB)`;
+      reductionEl.textContent = `${res.reduction}% ${res.success? '(target reached)':'(best effort)' } — precision ${res.precision===null? 'n/a' : res.precision}, ${elapsed} ms`;
+      setProgress(100, `Ready — ${res.reduction}% smaller`);
+      status.textContent = `Ready — ${res.reduction}% smaller`;
+    });
+
+    downloadBtn.addEventListener('click', ()=>{
+      if(!lastOptimizedText) return;
+      const blob = new Blob([lastOptimizedText], {type:'image/svg+xml'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = lastFilename || 'optimized.svg';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),2000);
+    });
+  </script>
+</body>
+</html>

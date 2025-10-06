@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>SVG Animator — Pencil Fix + Compact Modal Preview</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { --gap:10px; --panel-w:46%; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; padding:16px; background:#fafafa; color:#111; }
+    h3 { margin:0 0 12px 0; }
+    .app { display:flex; gap:var(--gap); align-items:flex-start; }
+    .panel { background:#fff; border:1px solid #e6e6e6; border-radius:8px; padding:12px; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
+    .left { width:var(--panel-w); min-width:380px; }
+    .right { flex:1; min-width:320px; }
+    .controls { display:flex; flex-direction:column; gap:8px; }
+    label { display:flex; flex-direction:row; gap:8px; align-items:center; font-size:14px; }
+    input[type="number"], select { width:120px; padding:6px; border-radius:4px; border:1px solid #ccc; }
+    input[type="file"] { font-size:13px; }
+    .btn-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+    button { padding:8px 10px; border-radius:6px; border:1px solid rgba(0,0,0,0.08); background:#007bff; color:#fff; cursor:pointer; }
+    button.secondary { background:#6c757d; }
+    a.ghost { display:inline-flex; gap:8px; align-items:center; padding:8px 10px; border-radius:6px; color:#007bff; border:1px dashed #007bff; text-decoration:none; }
+    #svg-container, #preview-container { width:100%; height:380px; border:1px dashed #ccc; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#fff; }
+    #svg-container svg, #preview-container svg { width:100%; height:100%; max-width:100%; max-height:100%; }
+    .row { display:flex; gap:8px; align-items:center; }
+    .small { font-size:13px; color:#444; }
+    #progress { margin-top:8px; font-size:13px; color:#444; min-height:18px; }
+    .controls-grid { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+    .muted { color:#666; font-size:13px; }
+
+    /* compact modal overlay & small preview canvas */
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); display:none; align-items:center; justify-content:center; z-index:9999; }
+    .modal { background:#fff; padding:12px; border-radius:8px; width:240px; box-shadow:0 6px 20px rgba(0,0,0,0.3); text-align:center; font-size:13px; }
+    .spinner { width:36px; height:36px; margin: 6px auto; border-radius:50%; border:5px solid #eee; border-top-color:#007bff; animation:spin 1s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .modal-progress { margin-top:6px; color:#222; }
+    .modal-buttons { margin-top:10px; display:flex; gap:8px; justify-content:center; }
+    .ghost-btn { background:transparent; border:1px solid #ccc; padding:6px 10px; border-radius:6px; cursor:pointer; font-size:13px; }
+
+    /* small preview inside modal */
+    #modalPreview { width:160px; height:110px; border:1px solid #eee; display:block; margin:8px auto 2px auto; background:transparent; }
+
+    /* hide render canvas */
+    canvas.hidden { display:none; }
+  </style>
+</head>
+<body>
+  <h3>SVG Animator — Pencil Fix + Compact Modal Preview</h3>
+
+  <div class="app">
+    <div class="panel left">
+      <div class="controls">
+        <label>Upload SVG: <input id="fileinput" type="file" accept=".svg,image/svg+xml"></label>
+
+        <div class="controls-grid">
+          <label>Duration (s): <input id="duration" type="number" value="3" min="0.5" step="0.5"></label>
+          <label>FPS: <input id="fps" type="number" value="20" min="5" max="30"></label>
+        </div>
+
+        <div class="row">
+          <label>Effect:
+            <select id="effectSelect">
+              <option value="stroke">Stroke (draw)</option>
+              <option value="pencil">Pencil (original)</option>
+              <option value="fade-in">Fade In</option>
+              <option value="fade-out">Fade Out</option>
+              <option value="wipe">Wipe Reveal</option>
+              <option value="bounce">Bounce</option>
+              <option value="slow-fill">Slow-down-to-fill</option>
+              <option value="top-to-bottom-fill">Top → Bottom Fill</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="row">
+          <label>Wipe / Fill Direction:
+            <select id="directionSelect">
+              <option value="left-to-right">Left → Right</option>
+              <option value="right-to-left">Right → Left</option>
+              <option value="top-to-bottom">Top → Bottom</option>
+              <option value="bottom-to-top">Bottom → Top</option>
+            </select>
+          </label>
+
+          <label>Slide Distance (%): <input id="slideDist" type="number" value="30" min="0" max="200" step="5"></label>
+        </div>
+
+        <div class="row">
+          <label><input id="strokeChk" type="checkbox" checked> Animate stroke</label>
+          <label><input id="fillChk" type="checkbox" checked> Animate fill</label>
+        </div>
+
+        <div class="btn-row">
+          <button id="previewPlay">Play Preview</button>
+          <button id="previewStop" class="secondary">Stop Preview</button>
+          <button id="startBtn" disabled>Start & Create GIF</button>
+          <a id="downloadLink" class="ghost" style="display:none;" download="animation.gif">Download GIF</a>
+        </div>
+
+        <div id="progress"></div>
+      </div>
+
+      <div style="margin-top:12px;" id="svg-container">Drop or upload an SVG file</div>
+    </div>
+
+    <div class="panel right">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div><strong>Preview</strong> <span class="small">(real-time)</span></div>
+        <div class="small">Use Play / Stop to preview</div>
+      </div>
+      <div id="preview-container" style="position:relative;">Preview will appear here</div>
+    </div>
+  </div>
+
+  <!-- compact modal with small live preview -->
+  <div id="modal" class="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal">
+      <div class="spinner" aria-hidden="true"></div>
+      <canvas id="modalPreview" width="160" height="110"></canvas>
+      <div id="modalText" class="modal-progress">Preparing...</div>
+      <div class="modal-buttons">
+        <button id="modalCancel" class="ghost-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="renderCanvas" class="hidden"></canvas>
+
+  <!-- gif.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+
+  <script>
+  // --- worker blob to avoid CORS issue ---
+  let _gifWorkerBlobUrl = null;
+  async function ensureGifWorkerBlob() {
+    if (window.GIF && GIF.prototype && GIF.prototype.workerScript && GIF.prototype.workerScript.startsWith('blob:')) return;
+    if (_gifWorkerBlobUrl) { GIF.prototype.workerScript = _gifWorkerBlobUrl; return; }
+    try {
+      const workerUrl = 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js';
+      const resp = await fetch(workerUrl);
+      if (!resp.ok) throw new Error('Failed to fetch worker script: ' + resp.status);
+      const txt = await resp.text();
+      const blob = new Blob([txt], { type: 'application/javascript' });
+      const blobUrl = URL.createObjectURL(blob);
+      _gifWorkerBlobUrl = blobUrl;
+      GIF.prototype.workerScript = blobUrl;
+    } catch (err) {
+      console.warn('Could not fetch worker script:', err);
+      throw new Error('Unable to prepare GIF worker script. If running as file://, serve via a local HTTP server (e.g. python -m http.server).');
+    }
+  }
+
+  // UI refs
+  const fileInput = document.getElementById('fileinput');
+  const svgContainer = document.getElementById('svg-container');
+  const previewContainer = document.getElementById('preview-container');
+  const startBtn = document.getElementById('startBtn');
+  const downloadLink = document.getElementById('downloadLink');
+  const durationInput = document.getElementById('duration');
+  const fpsInput = document.getElementById('fps');
+  const progressEl = document.getElementById('progress');
+  const canvas = document.getElementById('renderCanvas');
+  const ctx = canvas.getContext && canvas.getContext('2d');
+
+  const previewPlay = document.getElementById('previewPlay');
+  const previewStop = document.getElementById('previewStop');
+  const effectSelect = document.getElementById('effectSelect');
+  const directionSelect = document.getElementById('directionSelect');
+  const slideDist = document.getElementById('slideDist');
+  const strokeChk = document.getElementById('strokeChk');
+  const fillChk = document.getElementById('fillChk');
+
+  const modal = document.getElementById('modal');
+  const modalText = document.getElementById('modalText');
+  const modalCancel = document.getElementById('modalCancel');
+  const modalPreview = document.getElementById('modalPreview');
+  const modalCtx = modalPreview.getContext('2d');
+
+  let currentSVG = null;
+  let previewSVG = null;
+  let previewAnimId = null;
+  let previewStartTs = null;
+  let gifCancelRequested = false;
+
+  // Easing
+  const Easing = {
+    linear: t => t,
+    easeInOutSine: t => 0.5 - 0.5 * Math.cos(Math.PI * t),
+    easeOutBack: t => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); },
+    slowDown: t => 1 - Math.pow(1 - t, 2.5)
+  };
+  function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+
+  // ---------- SVG helpers ----------
+  function cloneForPreview(svgEl) {
+    if (!svgEl) return null;
+    const clone = svgEl.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    wrapInAnimGroup(clone);
+    if (!(clone.viewBox && clone.viewBox.baseVal && clone.viewBox.baseVal.width)) {
+      const w = clone.clientWidth || 600, h = clone.clientHeight || 400;
+      clone.setAttribute('width', w);
+      clone.setAttribute('height', h);
+    }
+    return clone;
+  }
+  function wrapInAnimGroup(svgEl) {
+    if (!svgEl) return;
+    if (svgEl.querySelector('#anim-wrap')) return;
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('id','anim-wrap');
+    while (svgEl.firstChild) g.appendChild(svgEl.firstChild);
+    svgEl.appendChild(g);
+  }
+
+  function computePathInfos(svgEl) {
+    const nodes = svgEl.querySelectorAll('path, line, polyline, polygon, circle, rect, ellipse');
+    const infos = [];
+    let total = 0;
+    nodes.forEach((p, idx) => {
+      try {
+        const length = (p.getTotalLength && p.getTotalLength()) || 0;
+        infos.push({ el: p, length, idx });
+        total += length;
+      } catch(e) {}
+    });
+    let cum = 0;
+    infos.forEach(info => {
+      info.start = total > 0 ? cum / total : 0;
+      cum += info.length;
+      info.end = total > 0 ? cum / total : 1;
+    });
+    return infos;
+  }
+
+  function prepareStrokeDash(svgEl) {
+    const infos = computePathInfos(svgEl);
+    infos.forEach(info => {
+      const p = info.el;
+      try {
+        if (!p.getAttribute('stroke')) p.setAttribute('stroke','#000');
+        if (!p.getAttribute('stroke-width')) p.setAttribute('stroke-width', 2);
+        p.style.transition = 'none';
+        // FULL-length dasharray for full-path reveal (pencil uses same but progressive)
+        p.style.strokeDasharray = info.length;
+        p.style.strokeDashoffset = info.length;
+        if (p.getAttribute('fill') && p.getAttribute('fill') !== 'none') p.style.fillOpacity = 0;
+        p.style.strokeLinecap = 'round';
+      } catch(e){}
+    });
+    svgEl._pathInfos = infos;
+    return infos;
+  }
+
+  function inlineComputedStyles(originalSvg, cloneSvg) {
+    const origEls = originalSvg.querySelectorAll('*');
+    const cloneEls = cloneSvg.querySelectorAll('*');
+    for (let i=0;i<cloneEls.length;i++){
+      const ce = cloneEls[i], oe = origEls[i];
+      if (!ce || !oe) continue;
+      const style = window.getComputedStyle(oe);
+      const props = ['stroke','stroke-width','stroke-linecap','stroke-linejoin','stroke-dasharray','stroke-dashoffset','fill','opacity','fill-opacity'];
+      props.forEach(p => {
+        const v = style.getPropertyValue(p);
+        if (v) ce.setAttribute(p, v);
+      });
+    }
+  }
+
+  // Remove likely background shapes (large filled rects/paths) so GIF keeps transparency
+  function stripBackgroundShapes(svgEl) {
+    try {
+      // compute svg canvas size
+      const vb = svgEl.viewBox && svgEl.viewBox.baseVal && svgEl.viewBox.baseVal.width ? svgEl.viewBox.baseVal
+                : { width: svgEl.clientWidth || parseFloat(svgEl.getAttribute('width')) || 600,
+                    height: svgEl.clientHeight || parseFloat(svgEl.getAttribute('height')) || 400 };
+      const canvasArea = Math.max(1, vb.width * vb.height);
+
+      // find candidate elements that could be background (rect, path, polygon, ellipse, circle)
+      const candidates = Array.from(svgEl.querySelectorAll('rect, path, polygon, ellipse, circle'));
+      candidates.forEach(el => {
+        try {
+          const fill = (el.getAttribute('fill') || '').trim().toLowerCase();
+          if (!fill || fill === 'none') return;
+
+          // skip elements that are obviously small
+          const bbox = (typeof el.getBBox === 'function') ? el.getBBox() : null;
+          if (!bbox) return;
+          const elArea = bbox.width * bbox.height;
+
+          // if element covers large portion (>= 65%) of canvas, treat as background and remove it
+          if (elArea >= canvasArea * 0.65) {
+            el.parentNode && el.parentNode.removeChild(el);
+          }
+        } catch (err) {
+          // ignore bbox errors for some elements
+        }
+      });
+
+      // ensure svg root has transparent background
+      svgEl.removeAttribute('background');
+      const existingStyle = svgEl.getAttribute('style') || '';
+      // keep other styles but force background transparent
+      const cleanedStyle = existingStyle.replace(/background[^;:]*(;|$)/gi, '');
+      svgEl.setAttribute('style', (cleanedStyle + ';background:transparent!important').replace(/^;+/,''));
+    } catch (e) {
+      // fail silently
+      console.warn('stripBackgroundShapes error', e);
+    }
+  }
+
+  // ---------- File input ----------
+  fileInput.addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const text = await f.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text,'image/svg+xml');
+    let svgEl = doc.querySelector('svg');
+    if (!svgEl) { alert('No <svg> element found in file.'); return; }
+
+    svgContainer.innerHTML = '';
+    svgEl = document.importNode(svgEl, true);
+    svgEl.setAttribute('xmlns','http://www.w3.org/2000/svg');
+
+    svgEl.querySelectorAll('*').forEach(node => {
+      const tag = (node.tagName||'').toLowerCase();
+      if (['path','line','polyline','polygon','circle','rect','ellipse'].includes(tag)) {
+        if (!node.getAttribute('stroke')) node.setAttribute('stroke','#000');
+        if (!node.getAttribute('stroke-width')) node.setAttribute('stroke-width',2);
+        if (!node.getAttribute('fill')) node.setAttribute('fill','none');
+      }
+    });
+
+    svgContainer.appendChild(svgEl);
+    currentSVG = svgEl;
+    startBtn.disabled = false;
+    downloadLink.style.display = 'none';
+    progressEl.textContent = '';
+    createPreview();
+  });
+
+  // drag & drop
+  svgContainer.addEventListener('dragover', e => { e.preventDefault(); svgContainer.style.opacity = 0.9; });
+  svgContainer.addEventListener('dragleave', e => { e.preventDefault(); svgContainer.style.opacity = 1; });
+  svgContainer.addEventListener('drop', async (e) => {
+    e.preventDefault(); svgContainer.style.opacity = 1;
+    const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (!f) return;
+    fileInput.files = e.dataTransfer.files;
+    fileInput.dispatchEvent(new Event('change'));
+  });
+
+  // -------- Preview ----------
+  function createPreview() {
+    previewContainer.innerHTML = '';
+    previewSVG = null;
+    if (!currentSVG) return;
+    previewSVG = cloneForPreview(currentSVG);
+    previewContainer.appendChild(previewSVG);
+    setupPreviewClipAndPrep(previewSVG);
+    prepareStrokeDash(previewSVG);
+  }
+
+  function setupPreviewClipAndPrep(svgEl) {
+    const suffix = Math.floor(Math.random()*100000);
+    const defs = svgEl.querySelector('defs') || document.createElementNS('http://www.w3.org/2000/svg','defs');
+    if (!svgEl.querySelector('defs')) svgEl.insertBefore(defs, svgEl.firstChild);
+    const clipId = 'clip-preview-' + suffix;
+    let clip = svgEl.querySelector('#' + clipId);
+    if (!clip) {
+      clip = document.createElementNS('http://www.w3.org/2000/svg','clipPath');
+      clip.setAttribute('id', clipId);
+      const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rect.setAttribute('id','clip-rect-' + suffix);
+      rect.setAttribute('x',0);
+      rect.setAttribute('y',0);
+      rect.setAttribute('width','100%');
+      rect.setAttribute('height','100%');
+      clip.appendChild(rect);
+      defs.appendChild(clip);
+    }
+    const wrap = svgEl.querySelector('#anim-wrap') || svgEl;
+    wrap.setAttribute('clip-path','url(#' + clipId + ')');
+    svgEl._clipRectId = 'clip-rect-' + suffix;
+  }
+
+  // apply effect (works for preview and GIF clones)
+  function applyEffectToSVG(svgEl, t01, opts = {}) {
+    const effect = opts.effect || effectSelect.value;
+    const easedDefault = Easing.easeInOutSine(t01);
+    const easedSlow = Easing.slowDown(t01);
+    const easedBounce = Easing.easeOutBack(t01);
+    const eased = (() => {
+      switch(effect) {
+        case 'bounce': return easedBounce;
+        case 'slow-fill': return easedSlow;
+        default: return easedDefault;
+      }
+    })();
+
+    const pathInfos = opts.pathInfos || svgEl._pathInfos || computePathInfos(svgEl);
+
+    // stroke animation
+    if (strokeChk.checked) {
+      pathInfos.forEach(info => {
+        const p = info.el;
+        try {
+          const len = info.length || (p.getTotalLength && p.getTotalLength()) || 0;
+          if (effect === 'pencil') {
+            // sequential full-path reveal
+            const s = info.start, e = info.end;
+            let progress = 0;
+            if (t01 <= s) progress = 0;
+            else if (t01 >= e) progress = 1;
+            else progress = (t01 - s) / (e - s);
+            progress = clamp(progress, 0, 1);
+            // full-length dasharray & dashoffset
+            p.style.strokeDasharray = len;
+            p.style.strokeDashoffset = Math.floor(len * (1 - progress));
+            // gentle stroke-width jitter for hand-drawn look
+            const baseW = parseFloat(p.getAttribute('stroke-width') || 2);
+            const jitter = Math.sin((info.idx + 1) * 7 + t01 * 40) * 0.08;
+            p.style.strokeWidth = Math.max(0.6, baseW + jitter);
+            p.style.strokeLinecap = 'round';
+          } else {
+            const prog = (effect === 'slow-fill') ? Easing.slowDown(t01) : eased;
+            p.style.strokeDasharray = len;
+            p.style.strokeDashoffset = Math.floor(len * (1 - prog));
+            p.style.strokeLinecap = '';
+          }
+        } catch(e){}
+      });
+    }
+
+    // fill animation
+    if (fillChk.checked) {
+      if (effect === 'top-to-bottom-fill') {
+        svgEl.querySelectorAll('*').forEach(n => {
+          const f = n.getAttribute && n.getAttribute('fill');
+          if (f && f !== 'none') n.style.fillOpacity = 1;
+        });
+        const rectId = svgEl._clipRectId;
+        const rect = rectId ? svgEl.querySelector('#' + rectId) : null;
+        if (rect) {
+          const dir = directionSelect.value;
+          if (dir === 'top-to-bottom') {
+            const h = 100 * eased;
+            rect.setAttribute('x','0'); rect.setAttribute('y','0'); rect.setAttribute('width','100%'); rect.setAttribute('height', h + '%');
+          } else if (dir === 'bottom-to-top') {
+            const h = 100 * eased;
+            rect.setAttribute('x','0'); rect.setAttribute('y', (100 - h) + '%'); rect.setAttribute('width','100%'); rect.setAttribute('height', h + '%');
+          } else if (dir === 'left-to-right') {
+            const w = 100 * eased;
+            rect.setAttribute('x','0'); rect.setAttribute('y','0'); rect.setAttribute('width', w + '%'); rect.setAttribute('height','100%');
+          } else {
+            const w = 100 * eased;
+            rect.setAttribute('x', (100 - w) + '%'); rect.setAttribute('y','0'); rect.setAttribute('width', w + '%'); rect.setAttribute('height','100%');
+          }
+        }
+      } else {
+        svgEl.querySelectorAll('*').forEach((n, idx) => {
+          const f = n.getAttribute && n.getAttribute('fill');
+          if (f && f !== 'none') {
+            if (effect === 'fade-out') n.style.fillOpacity = clamp(1 - eased, 0, 1);
+            else {
+              const val = (effect === 'slow-fill') ? Easing.slowDown(t01) : eased;
+              n.style.fillOpacity = clamp(val, 0, 1);
+            }
+          }
+        });
+      }
+    }
+
+    // wipe effect: manipulate clip-rect percent
+    if (effect === 'wipe') {
+      const rectId = svgEl._clipRectId;
+      const rect = rectId ? svgEl.querySelector('#' + rectId) : null;
+      if (rect) {
+        const dir = directionSelect.value;
+        if (dir === 'left-to-right') {
+          rect.setAttribute('x','0'); rect.setAttribute('y','0'); rect.setAttribute('width', (100 * eased) + '%'); rect.setAttribute('height','100%');
+        } else if (dir === 'right-to-left') {
+          rect.setAttribute('x', (100 - 100*eased) + '%'); rect.setAttribute('y','0'); rect.setAttribute('width', (100 * eased) + '%'); rect.setAttribute('height','100%');
+        } else if (dir === 'top-to-bottom') {
+          rect.setAttribute('x','0'); rect.setAttribute('y','0'); rect.setAttribute('width','100%'); rect.setAttribute('height', (100 * eased) + '%');
+        } else {
+          rect.setAttribute('x','0'); rect.setAttribute('y', (100 - 100*eased) + '%'); rect.setAttribute('width', '100%'); rect.setAttribute('height', (100 * eased) + '%');
+        }
+      }
+    }
+
+    // bounce / slide
+    const wrap = svgEl.querySelector('#anim-wrap') || svgEl;
+    const distPct = parseFloat(slideDist.value) || 0;
+    const vb = svgEl.viewBox && svgEl.viewBox.baseVal && svgEl.viewBox.baseVal.width ? svgEl.viewBox.baseVal : null;
+    const wPx = vb ? vb.width : (svgEl.clientWidth || 600);
+    const hPx = vb ? vb.height : (svgEl.clientHeight || 400);
+    const distY = (distPct/100) * hPx;
+    let tx = 0, ty = 0;
+    if (effect === 'bounce') {
+      const b = Easing.easeOutBack(t01);
+      ty = (1 - b) * -distY * 0.6;
+    }
+    wrap.setAttribute('transform', `translate(${tx},${ty})`);
+  }
+
+  // -------- Preview controls ----------
+  previewPlay.addEventListener('click', () => {
+    if (!currentSVG) return;
+    if (!previewSVG) createPreview();
+    if (!previewSVG) return;
+    cancelPreview();
+    previewStartTs = null;
+    const dur = Math.max(0.1, parseFloat(durationInput.value) || 2) * 1000;
+    function step(ts) {
+      if (!previewStartTs) previewStartTs = ts;
+      const elapsed = ts - previewStartTs;
+      const t = Math.min(1, elapsed / dur);
+      applyEffectToSVG(previewSVG, t, { effect: effectSelect.value, pathInfos: previewSVG._pathInfos });
+      if (t < 1) previewAnimId = requestAnimationFrame(step);
+      else previewAnimId = null;
+    }
+    setupPreviewClipAndPrep(previewSVG);
+    prepareStrokeDash(previewSVG);
+    previewAnimId = requestAnimationFrame(step);
+  });
+
+  previewStop.addEventListener('click', () => {
+    cancelPreview();
+    if (previewSVG) applyEffectToSVG(previewSVG, 0, { effect: effectSelect.value });
+  });
+
+  function cancelPreview() {
+    if (previewAnimId) { cancelAnimationFrame(previewAnimId); previewAnimId = null; previewStartTs = null; }
+  }
+
+  // -------- Modal helpers --------
+  function showModal(text) {
+    modalText.textContent = text || 'Working...';
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden','false');
+    // clear modal preview
+    modalCtx.clearRect(0,0,modalPreview.width, modalPreview.height);
+  }
+  function updateModal(text) { modalText.textContent = text || modalText.textContent; }
+  function hideModal() { modal.style.display = 'none'; modal.setAttribute('aria-hidden','true'); }
+
+  modalCancel.addEventListener('click', () => {
+    gifCancelRequested = true;
+    updateModal('Cancelling...');
+  });
+
+  // -------- GIF rendering with small modal live-preview (no forced bg) ----------
+  async function renderFramesToGif(svgEl, durationSec, fps) {
+    await ensureGifWorkerBlob();
+    gifCancelRequested = false;
+    showModal('Preparing frames...');
+    const bbox = svgEl.viewBox && svgEl.viewBox.baseVal && svgEl.viewBox.baseVal.width ? svgEl.viewBox.baseVal
+                : svgEl.getBBox ? svgEl.getBBox() : { width: svgEl.clientWidth || 600, height: svgEl.clientHeight || 400 };
+    const w = Math.max(1, Math.round(bbox.width || svgEl.clientWidth || 600));
+    const h = Math.max(1, Math.round(bbox.height || svgEl.clientHeight || 400));
+    canvas.width = w; canvas.height = h;
+
+    const frames = Math.max(1, Math.round(durationSec * fps));
+    const delay = Math.round(1000 / fps);
+
+    // Work clone
+    const work = cloneForPreview(svgEl);
+    inlineComputedStyles(svgEl, work);
+
+    // Remove any full-bleed background shapes so the GIF remains transparent and only paths animate
+    stripBackgroundShapes(work);
+
+    setupPreviewClipAndPrep(work);
+    const pathInfos = computePathInfos(work);
+    work._pathInfos = pathInfos;
+    prepareStrokeDash(work);
+
+    // create GIF - do NOT prefill frame background; we'll add frames from image elements (transparent preserved if possible)
+    const gif = new GIF({ workers: 2, quality: 10, width: w, height: h, workerScript: GIF.prototype.workerScript });
+
+    for (let i=0;i<frames;i++){
+      if (gifCancelRequested) {
+        hideModal();
+        throw new Error('GIF creation cancelled');
+      }
+
+      const t = frames === 1 ? 1 : i / (frames - 1);
+      applyEffectToSVG(work, t, { effect: effectSelect.value, pathInfos });
+
+      // clone & inline styles for current frame
+      const serializer = new XMLSerializer();
+      const cloneForImage = work.cloneNode(true);
+      cloneForImage.setAttribute('width', w);
+      cloneForImage.setAttribute('height', h);
+      // ensure transparent background style on the per-frame clone
+      cloneForImage.removeAttribute('background');
+      const s = cloneForImage.getAttribute('style') || '';
+      cloneForImage.setAttribute('style', s.replace(/background[^;:]*(;|$)/gi,'') + ';background:transparent!important;');
+
+      inlineComputedStyles(work, cloneForImage);
+
+      // Double-check: remove any remaining obvious background rects in the per-frame clone
+      stripBackgroundShapes(cloneForImage);
+
+      const svgStr = serializer.serializeToString(cloneForImage);
+      const svgDataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
+
+      // update modal text & small preview
+      updateModal(`Rendering frames... ${i+1}/${frames}`);
+
+      // load image and add to gif (use gif.addFrame(img, {copy:true, delay}) to avoid permanent canvas fill)
+      await new Promise((resolve) => {
+        const img = new Image();
+        // Allow cross-origin in case the SVG references external resources (can't guarantee) — use anonymous
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            // update small modal preview scaled to modalPreview canvas
+            modalCtx.clearRect(0,0,modalPreview.width, modalPreview.height);
+            // keep aspect fit
+            const ar = w / h;
+            const mw = modalPreview.width, mh = modalPreview.height;
+            let dw = mw, dh = Math.round(mw / ar);
+            if (dh > mh) { dh = mh; dw = Math.round(mh * ar); }
+            const dx = Math.round((mw - dw) / 2), dy = Math.round((mh - dh) / 2);
+            modalCtx.drawImage(img, dx, dy, dw, dh);
+
+            // add frame directly from image — avoids forcing white background on our canvas
+            gif.addFrame(img, { copy: true, delay });
+          } catch(e) {
+            console.error('Error adding frame', e);
+          }
+          resolve();
+        };
+        img.onerror = (e) => {
+          console.error('Image load error for frame', i, e);
+          resolve();
+        };
+        img.src = svgDataUrl;
+      });
+
+      // small breathing time for UI responsiveness
+      await new Promise(r => setTimeout(r, 6));
+    }
+
+    updateModal('Finalizing GIF...');
+    return new Promise((resolve, reject) => {
+      gif.on('finished', function(blob) {
+        hideModal();
+        resolve(blob);
+      });
+      gif.on('error', function(err) {
+        hideModal();
+        reject(err);
+      });
+      gif.render();
+    });
+  }
+
+  startBtn.addEventListener('click', async () => {
+    if (!currentSVG) return;
+    startBtn.disabled = true;
+    downloadLink.style.display = 'none';
+    progressEl.textContent = 'Preparing GIF...';
+    const dur = parseFloat(durationInput.value) || 2;
+    const fps = parseInt(fpsInput.value) || 20;
+    try {
+      const blob = await renderFramesToGif(currentSVG, dur, fps);
+      const url = URL.createObjectURL(blob);
+      downloadLink.href = url;
+      downloadLink.style.display = 'inline-flex';
+      downloadLink.textContent = 'Download GIF';
+      progressEl.textContent = 'Done — GIF ready.';
+    } catch (err) {
+      console.error(err);
+      if (err.message === 'GIF creation cancelled') {
+        progressEl.textContent = 'GIF creation cancelled.';
+      } else {
+        progressEl.textContent = 'Error creating GIF: ' + (err && err.message || err);
+        if (err.message && err.message.includes('local HTTP server')) progressEl.textContent += ' Try serving via a local HTTP server (e.g. `python -m http.server`).';
+      }
+    } finally {
+      startBtn.disabled = false;
+    }
+  });
+
+  // recreate preview when options change
+  [effectSelect, directionSelect, slideDist, strokeChk, fillChk].forEach(el => el.addEventListener('change', () => { if (previewSVG) createPreview(); }));
+
+  // init if svg present
+  if (document.querySelector('#svg-container svg')) {
+    currentSVG = document.querySelector('#svg-container svg');
+    createPreview();
+    startBtn.disabled = false;
+  }
+  </script>
+</body>
+</html>

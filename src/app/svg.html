@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Image → Color SVG (ImageTracer.js v1.2.3) — target-size compression UI</title>
+  <style>
+    :root{ --bg:#f4f7fb; --card:#fff; --accent:#0b8f76; --muted:#556067; --ok:#16a34a; --warn:#f59e0b; --bad:#ef4444; }
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;}
+    body{background:var(--bg);display:flex;align-items:flex-start;justify-content:center;padding:28px;}
+    .wrap{width:920px;max-width:96%;background:var(--card);border-radius:12px;box-shadow:0 12px 30px rgba(16,24,40,.06);padding:18px;display:grid;grid-template-columns:300px 1fr;gap:18px}
+    .panel{background:var(--card);border-radius:8px;padding:14px;border:1px solid rgba(0,0,0,.04)}
+    .h{font-weight:700;margin:0 0 10px 0}
+    .muted{color:var(--muted);font-size:13px;margin-bottom:10px}
+    input[type=file]{width:100%}
+    button{background:var(--accent);color:#fff;border:0;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+    button[disabled]{opacity:.6;cursor:not-allowed}
+    .center{display:flex;align-items:center;gap:8px}
+    canvas{max-width:100%;height:auto;border-radius:6px;display:block}
+    .preview{min-height:320px;display:flex;flex-direction:column;gap:10px}
+    .svg-box{background:#fff;border:1px dashed rgba(16,24,40,.04);padding:12px;border-radius:8px;overflow:auto;min-height:240px}
+    /* Smaller previews (300px width) */
+    .svg-box svg, #srcHolder img { width:300px; height:auto; max-width:100%; display:block; margin:0 auto; }
+    .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .chip{background:rgba(16,24,40,.04);padding:6px 8px;border-radius:999px;font-size:13px;color:var(--muted)}
+    .status-chip{padding:6px 10px;border-radius:999px;font-size:13px;color:#fff}
+    a.link{color:var(--accent);text-decoration:none;margin-left:6px}
+    footer{grid-column:1/-1;margin-top:6px;color:var(--muted);font-size:13px}
+    .small{font-size:13px}
+    .row{display:flex;gap:8px;align-items:center}
+    input[type=number]{width:80px;padding:6px;border-radius:6px;border:1px solid rgba(0,0,0,.06)}
+    label{font-size:13px;color:var(--muted)}
+    /* loading spinner on button */
+    button.loading { position:relative; opacity:0.95; }
+    button.loading::after {
+      content: '';
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.6);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
+    /* hide download until ready */
+    #download { display: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap" role="main">
+    <div class="panel">
+      <h3 class="h">Upload image</h3>
+      <div class="muted">Supported: PNG, JPG, GIF. For best results use high-contrast images or logos. Max resize internally for performance.</div>
+      <input id="file" type="file" accept="image/*">
+      <div style="height:12px"></div>
+
+      <!-- Compression controls -->
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="row">
+          <input id="enableCompress" type="checkbox" />
+          <label for="enableCompress" class="small">Enable size target (compress to max)</label>
+        </div>
+        <div class="row" style="align-items:center">
+          <label for="targetKB" class="small">Target max size (KB):</label>
+          <input id="targetKB" type="number" min="10" max="2000" value="300" />
+          <div style="margin-left:8px;color:var(--muted);font-size:13px">If enabled, converter will iteratively try to reach this size.</div>
+        </div>
+        <div id="compressInfo" class="small muted">Compression not enabled</div>
+      </div>
+
+      <div style="height:12px"></div>
+
+      <!-- Convert Now button (below compressor controls) -->
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button id="convert">Convert Now</button>
+        <button id="download">Download SVG (minified)</button>
+      </div>
+
+      <div style="height:12px"></div>
+      <div class="muted">Source preview (fixed 300px width)</div>
+      <div style="background:#fafbfd;border-radius:6px;padding:8px;border:1px solid rgba(0,0,0,.03);min-height:180px;display:flex;align-items:center;justify-content:center" id="srcHolder">
+        No image loaded
+      </div>
+    </div>
+
+    <div class="panel preview">
+      <h3 class="h">SVG preview (color) — preview at 300px width</h3>
+      <div class="svg-box" id="svgBox">
+        Converted SVG will appear here
+      </div>
+      <div class="meta">
+        <div class="chip" id="svgRawSize">Raw SVG: —</div>
+        <div class="chip" id="svgMinSize">Minified: —</div>
+        <div class="chip" id="pathCount">Paths: —</div>
+        <div class="chip" id="resolution">Source: —</div>
+      </div>
+
+      <div style="margin-top:10px;">
+        <div class="muted small">Conversion attempts / info:</div>
+        <div id="attemptsInfo" class="chip" style="background:rgba(16,24,40,.02)">No attempts yet</div>
+      </div>
+    </div>
+
+    <footer>Conversion powered by ImageTracer.js v1.2.3 (color tracing preset). numberOfColors increased to 64 for richer palettes. Compression option: iterative parameter tuning to reach a chosen KB target.</footer>
+  </div>
+
+  <!-- ImageTracer v1.2.3 from jsDelivr -->
+  <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.3/imagetracer_v1.2.3.js"></script>
+
+  <script>
+    // UI refs
+    const fileEl = document.getElementById('file');
+    const srcHolder = document.getElementById('srcHolder');
+    const convertBtn = document.getElementById('convert');
+    const downloadBtn = document.getElementById('download');
+    const svgBox = document.getElementById('svgBox');
+    const svgRawSizeChip = document.getElementById('svgRawSize');
+    const svgMinSizeChip = document.getElementById('svgMinSize');
+    const pathCountChip = document.getElementById('pathCount');
+    const resolutionChip = document.getElementById('resolution');
+    const enableCompressEl = document.getElementById('enableCompress');
+    const targetKBel = document.getElementById('targetKB');
+    const compressInfo = document.getElementById('compressInfo');
+    const attemptsInfo = document.getElementById('attemptsInfo');
+
+    let lastMinifiedSvg = null;
+    let lastSvgUrl = null;
+    let uploadedImage = null;
+    let originalW = 0, originalH = 0;
+    const MAX_W = 1200, MAX_H = 900;
+
+    // Tuned options for high-fidelity color tracing (always "color" mode)
+    const TRACE_OPTIONS = {
+      ltres: 0.5,
+      qtres: 0.5,
+      pathomit: 1,
+      rightangleenhance: true,
+      colorsampling: 2,
+      numberofcolors: 64,
+      mincolorratio: 0,
+      colorquantcycles: 5,
+      blurradius: 0,
+      blurdelta: 20,
+      strokewidth: 1,
+      linefilter: true,
+      scale: 1,
+      roundcoords: 2,
+      lcpr: 0,
+      qcpr: 0,
+      desc: false,
+      viewbox: true,
+      corsenabled: true
+    };
+
+    // Helper: draw image into canvas (resized to reasonable max to speed tracing)
+    function drawToCanvas(img) {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      const ratio = Math.min(MAX_W / w, MAX_H / h, 1);
+      w = Math.round(w * ratio);
+      h = Math.round(h * ratio);
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      return canvas;
+    }
+
+    // Minify & adapt SVG: ensure viewBox is set (0 0 canvasW canvasH) and width/height are original image dims
+    function minifyAndSetSize(svgStr, canvasW, canvasH, origW, origH) {
+      if (!svgStr) return svgStr;
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(svgStr, 'image/svg+xml');
+        if (doc.getElementsByTagName('parsererror').length) throw new Error('Parser error');
+        const svgEl = doc.documentElement;
+
+        // remove comment nodes
+        const walker = doc.createTreeWalker(svgEl, NodeFilter.SHOW_COMMENT, null, false);
+        const toRemove = [];
+        let n;
+        while ((n = walker.nextNode())) toRemove.push(n);
+        toRemove.forEach(c => c.parentNode && c.parentNode.removeChild(c));
+
+        // remove <desc> elements
+        const descs = svgEl.getElementsByTagName('desc');
+        for (let i = descs.length - 1; i >= 0; i--) {
+          descs[i].parentNode && descs[i].parentNode.removeChild(descs[i]);
+        }
+
+        // ensure viewBox maps actual traced coordinate system (canvas dimensions)
+        if (!svgEl.getAttribute('viewBox')) {
+          svgEl.setAttribute('viewBox', `0 0 ${canvasW} ${canvasH}`);
+        }
+
+        // set width/height to original image pixel size (so downloaded SVG uses original size)
+        if (typeof origW === 'number' && typeof origH === 'number' && origW > 0 && origH > 0) {
+          svgEl.setAttribute('width', String(origW));
+          svgEl.setAttribute('height', String(origH));
+        } else {
+          svgEl.setAttribute('width', String(canvasW));
+          svgEl.setAttribute('height', String(canvasH));
+        }
+
+        // preserve aspect ratio
+        svgEl.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+        // serialize and collapse whitespace
+        let out = new XMLSerializer().serializeToString(svgEl);
+        out = out.replace(/>\s+</g, '><').trim();
+        return out;
+      } catch (e) {
+        // fallback simple string minify
+        let s = svgStr.replace(/<\?xml[\s\S]*?\?>/gi, '');
+        s = s.replace(/<!--[\s\S]*?-->/g, '');
+        s = s.replace(/<desc>[\s\S]*?<\/desc>/gi, '');
+        s = s.replace(/>\s+</g, '><').trim();
+        try {
+          s = s.replace(/<svg([^>]*)>/i, (m, attrs) => {
+            let newAttrs = attrs;
+            if (!/viewBox=/i.test(attrs)) newAttrs += ` viewBox="0 0 ${canvasW} ${canvasH}"`;
+            if (!/width=/i.test(attrs)) newAttrs += ` width="${origW||canvasW}"`;
+            if (!/height=/i.test(attrs)) newAttrs += ` height="${origH||canvasH}"`;
+            if (!/preserveAspectRatio=/i.test(attrs)) newAttrs += ' preserveAspectRatio="xMidYMid meet"';
+            return `<svg${newAttrs}>`;
+          });
+        } catch(_) {}
+        return s;
+      }
+    }
+
+    // Clean up previous object URL
+    function revokePreviousUrl() {
+      if (lastSvgUrl) {
+        try { URL.revokeObjectURL(lastSvgUrl); } catch (e) {}
+        lastSvgUrl = null;
+      }
+    }
+
+    // When user selects file (no auto-convert)
+    fileEl.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        const img = new Image();
+        img.onload = function() {
+          uploadedImage = img;
+          originalW = img.width;
+          originalH = img.height;
+          // show preview (fixed 300px width, height auto)
+          const previewCanvas = drawToCanvas(img);
+          srcHolder.innerHTML = '';
+          const previewImg = document.createElement('img');
+          previewImg.src = previewCanvas.toDataURL('image/png');
+          previewImg.style.width = '300px';
+          previewImg.style.height = 'auto';
+          previewImg.style.maxWidth = '100%';
+          srcHolder.appendChild(previewImg);
+
+          convertBtn.disabled = false;
+          // update resolution info but DO NOT auto-convert
+          resolutionChip.textContent = `Original: ${originalW}×${originalH} — preview ${previewCanvas.width}×${previewCanvas.height}`;
+        };
+        img.onerror = function() {
+          srcHolder.textContent = 'Failed to load image (maybe CORS).';
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Manual convert button
+    convertBtn.addEventListener('click', () => {
+      if (!uploadedImage) return;
+      const canvas = drawToCanvas(uploadedImage);
+      const enableCompress = enableCompressEl.checked;
+      const targetKB = Math.max(10, Number(targetKBel.value) || 300);
+      // show loading state
+      convertBtn.disabled = true;
+      convertBtn.classList.add('loading');
+      convertBtn.textContent = 'Converting…';
+      // hide download until done
+      downloadBtn.style.display = 'none';
+
+      // run conversion (async-friendly though ImageTracer is sync)
+      setTimeout(() => { // allow UI/paint update so the spinner shows
+        doConvert(canvas, uploadedImage.width, uploadedImage.height, enableCompress, targetKB)
+          .finally(() => {
+            convertBtn.disabled = false;
+            convertBtn.classList.remove('loading');
+            convertBtn.textContent = 'Convert Now';
+          });
+      }, 50);
+    });
+
+    // Iterative compression strategy:
+    function doConvert(canvas, origW, origH, enableCompress=false, targetKB=300) {
+      // Reset UI pieces
+      svgBox.innerHTML = '<div style="color:#666">Converting, please wait…</div>';
+      svgRawSizeChip.textContent = 'Raw SVG: —';
+      svgMinSizeChip.textContent = 'Minified: —';
+      pathCountChip.textContent = 'Paths: —';
+      attemptsInfo.textContent = 'No attempts yet';
+      compressInfo.textContent = enableCompress ? `Enabled — target ${targetKB} KB` : 'Compression not enabled';
+
+      return new Promise((resolve) => {
+        try {
+          const imgd = ImageTracer.getImgdata(canvas);
+          const baseOpts = JSON.parse(JSON.stringify(TRACE_OPTIONS));
+
+          function runTraceWithOpts(opts) {
+            const rawSvg = ImageTracer.imagedataToSVG(imgd, opts);
+            const rawBytes = new TextEncoder().encode(rawSvg).length;
+            const minified = minifyAndSetSize(rawSvg, canvas.width, canvas.height, origW, origH);
+            const minBytes = new TextEncoder().encode(minified).length;
+            return { rawSvg, minified, rawBytes, minBytes };
+          }
+
+          // initial high-fidelity pass
+          const first = runTraceWithOpts(baseOpts);
+          svgRawSizeChip.textContent = `Raw SVG: ${Math.round(first.rawBytes/1024*100)/100} KB`;
+          svgMinSizeChip.textContent = `Minified: ${Math.round(first.minBytes/1024*100)/100} KB`;
+
+          if (!enableCompress) {
+            lastMinifiedSvg = first.minified;
+            svgBox.innerHTML = first.minified;
+            const paths = (first.minified.match(/<path/g) || []).length;
+            pathCountChip.textContent = `Paths: ${paths}`;
+            prepareDownload(first.minified);
+            resolve();
+            return;
+          }
+
+          const targetBytes = Math.max(1024, Math.round(targetKB * 1024));
+          if (first.minBytes <= targetBytes) {
+            lastMinifiedSvg = first.minified;
+            svgBox.innerHTML = first.minified;
+            const paths = (first.minified.match(/<path/g) || []).length;
+            pathCountChip.textContent = `Paths: ${paths}`;
+            svgMinSizeChip.textContent = `Minified: ${Math.round(first.minBytes/1024*100)/100} KB`;
+            prepareDownload(first.minified);
+            resolve();
+            return;
+          }
+
+          let attempts = 0;
+          const maxAttempts = 12;
+          let opts = JSON.parse(JSON.stringify(baseOpts));
+          let best = { minified: first.minified, minBytes: first.minBytes };
+
+          while (attempts < maxAttempts && best.minBytes > targetBytes) {
+            attempts++;
+            if (opts.numberofcolors > 2 && attempts <= 4) {
+              const step = Math.max(1, Math.ceil((opts.numberofcolors - 2) / 2));
+              opts.numberofcolors = Math.max(2, opts.numberofcolors - step);
+            } else if (opts.pathomit < 12 && attempts <= 7) {
+              opts.pathomit = Math.min(12, opts.pathomit + 1);
+            } else if (opts.scale > 0.45 && attempts <= 9) {
+              opts.scale = Math.max(0.45, Math.round((opts.scale - 0.1) * 100) / 100);
+            } else if (opts.roundcoords < 5 && attempts <= 11) {
+              opts.roundcoords = Math.min(6, opts.roundcoords + 1);
+            } else {
+              opts.ltres = Math.min(2, opts.ltres + 0.2);
+              opts.qtres = Math.min(2, opts.qtres + 0.2);
+            }
+
+            const result = runTraceWithOpts(opts);
+
+            if (result.minBytes < best.minBytes) {
+              best.minified = result.minified;
+              best.minBytes = result.minBytes;
+            }
+
+            attemptsInfo.textContent = `Attempt ${attempts}/${maxAttempts} — ${Math.round(result.minBytes/1024*100)/100} KB (colors:${opts.numberofcolors} pathomit:${opts.pathomit} scale:${opts.scale} round:${opts.roundcoords})`;
+            // small yield to UI so attemptsInfo can update in heavy loops (not fully async but gives paint)
+            // we won't await here because ImageTracer is synchronous; but setTimeout allows UI update.
+            const t0 = Date.now();
+            while (Date.now() - t0 < 8) {} // brief busy wait to let DOM reflect (keeps logic sync)
+          }
+
+          // choose best result
+          const chosen = best;
+          lastMinifiedSvg = chosen.minified;
+          svgBox.innerHTML = chosen.minified;
+          const paths = (chosen.minified.match(/<path/g) || []).length;
+          pathCountChip.textContent = `Paths: ${paths}`;
+          svgMinSizeChip.textContent = `Minified: ${Math.round(chosen.minBytes/1024*100)/100} KB`;
+          attemptsInfo.textContent = `Completed attempts: ${Math.min(maxAttempts, Math.max(1, attempts))} — best ${Math.round(chosen.minBytes/1024*100)/100} KB`;
+          prepareDownload(chosen.minified);
+          resolve();
+        } catch (err) {
+          console.error(err);
+          svgBox.innerHTML = '<div style="color:crimson">Conversion failed. See console for details.</div>';
+          resolve();
+        }
+      });
+    }
+
+    function prepareDownload(minified) {
+      revokePreviousUrl();
+      const blob = new Blob([minified], {type: 'image/svg+xml;charset=utf-8'});
+      lastSvgUrl = URL.createObjectURL(blob);
+      downloadBtn.style.display = 'inline-block';
+      downloadBtn.disabled = false;
+      downloadBtn.onclick = () => {
+        const a = document.createElement('a');
+        a.href = lastSvgUrl;
+        a.download = 'vectorized.min.svg';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      };
+    }
+
+    // Revoke URL when unloading page
+    window.addEventListener('unload', () => {
+      revokePreviousUrl();
+    });
+
+    // initialize UI state
+    convertBtn.disabled = true;
+    downloadBtn.style.display = 'none';
+  </script>
+</body>
+</html>
