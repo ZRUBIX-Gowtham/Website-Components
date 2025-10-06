@@ -32,7 +32,7 @@ const MENU = [
     href: '',
     submenu: [
       { label: 'Section 31', href: '/Section_31' },
-      { label: 'Section 51', href: '/Section_51' },
+      { label: 'Section 53', href: '/Section_53' },
     ],
   },
 ];
