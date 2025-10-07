@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Card Carousel with Radial Background (Slower scroll + drag)</title>
+<style>
+  /* Radial Background Styles */
+  html, body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* register custom props (Chrome/Edge) */
+  @property --position {
+    syntax: "<length-percentage>";
+    initial-value: 0%;
+    inherits: false;
+  }
+  @property --color-0 {
+    syntax: "<color>";
+    initial-value: transparent;
+    inherits: false;
+  }
+  @property --color-1 {
+    syntax: "<color>";
+    initial-value: transparent;
+    inherits: false;
+  }
+
+  /* Container */
+  .container {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Base radial */
+  .radial {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    background: radial-gradient(
+      circle,
+      var(--color-0) var(--position, 0%),
+      var(--color-1) 0
+    );
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    mix-blend-mode: screen;
+    opacity: 1;
+    animation-fill-mode: both;
+  }
+
+  /* Big background circle */
+  .radial--big {
+    width: 120vmax;
+    height: 120vmax;
+    z-index: 1;
+
+    animation-name: color-0, position, color-1;
+    animation-duration: 6s, 6s, 6s;
+    animation-timing-function: linear, linear, linear;
+    animation-iteration-count: infinite, infinite, infinite;
+    animation-delay: -1.5s, -1.5s, -1.5s;
+  }
+
+  /* Mid circle container variables */
+  .radial--mid {
+    width: 100vmax;
+    height: 100vmax;
+    z-index: 2;
+
+    --zoom-duration: 10s;
+    --zoom-delay: calc(var(--zoom-duration) / 2);
+  }
+
+  /* Mid layer A */
+  .mid-a {
+    animation-name: color-0, position, color-1, zoom, fade;
+    animation-duration: 3.5s, 3.5s, 3.5s, var(--zoom-duration), var(--zoom-duration);
+    animation-timing-function: linear, linear, linear, linear, linear;
+    animation-iteration-count: infinite, infinite, infinite, infinite, infinite;
+    animation-delay: 0s, 0s, 0s, 0s, 0s;
+  }
+
+  /* Mid layer B (phase-shifted by half the cycle) */
+  .mid-b {
+    animation-name: color-0, position, color-1, zoom, fade;
+    animation-duration: 3.5s, 3.5s, 3.5s, var(--zoom-duration), var(--zoom-duration);
+    animation-timing-function: linear, linear, linear, linear, linear;
+    animation-iteration-count: infinite, infinite, infinite, infinite, infinite;
+    animation-delay: 0s, 0s, 0s, var(--zoom-delay), var(--zoom-delay);
+  }
+
+  /* Zoom animation */
+  @keyframes zoom {
+    0%   { transform: translate(-50%, -50%) scale(1); }
+    100% { transform: translate(-50%, -50%) scale(2); }
+  }
+
+  /* Fade animation */
+  @keyframes fade {
+    0%   { opacity: 1; }
+    45%  { opacity: 1; }
+    60%  { opacity: 0; }
+    100% { opacity: 0; }
+  }
+
+  /* Position animation */
+  @keyframes position {
+    0%   { --position: 0%; }
+    100% { --position: 100%; }
+  }
+
+  /* Color keyframes */
+  @keyframes color-0 {
+    0%   { --color-0: var(--c0-start); }
+    50%  { --color-0: var(--c0-alt); }
+    100% { --color-0: var(--c0-start); }
+  }
+  @keyframes color-1 {
+    0%   { --color-1: var(--c1-start); }
+    50%  { --color-1: var(--c1-alt); }
+    100% { --color-1: var(--c1-start); }
+  }
+
+  /* Card Carousel Styles */
+  :root{
+    --center-width: 420px;
+    --center-height: 480px;
+    --near-width: 240px;
+    --near-height: 240px;
+    --outer-width: 180px;
+    --outer-height: 180px;
+    --gap-left-1: 0%;
+    --gap-left-2: 20%;
+    --gap-left-3: 50%;
+    --gap-left-4: 80%;
+    --gap-left-5: 100%;
+    --circle-size: 520px;
+    --zoom-scale-1: 0.6;
+    --zoom-scale-2: 0.8;
+    --zoom-scale-3: 1.0;
+    --zoom-scale-4: 0.8;
+    --zoom-scale-5: 0.6;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  
+  body{
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    display:flex;align-items:center;justify-content:center;
+    overflow:hidden;position:relative;
+    background: none;
+  }
+
+  /* visual wrapper - receives wheel & touch events */
+  .wrap { 
+    width:94%; 
+    max-width:1200px; 
+    height:520px; 
+    position:relative; 
+    z-index:20; 
+    perspective:1200px; 
+    pointer-events: auto;
+    touch-action: pan-y; /* allow vertical page pan when not capturing horizontal swipe */
+  }
+
+  .track{ 
+    position:relative; 
+    width:100%; 
+    height:100%;
+    /* track translation (for drag feedback) */
+    transition: transform 420ms cubic-bezier(.22,.9,.23,1);
+    will-change: transform;
+  }
+  
+  .card{
+    position:absolute; 
+    top:50%; 
+    transform:translate(-50%,-50%);
+    border-radius:18px; 
+    overflow:hidden; 
+    background:#fff;
+    border:4px solid rgba(255,255,255,0.9); 
+    box-shadow:0 28px 50px rgba(0,0,0,0.18);
+    transition: transform 520ms cubic-bezier(.22,.9,.23,1), box-shadow 220ms;
+    cursor:pointer; 
+    z-index:18;
+    user-select: none;
+    -webkit-user-drag: none;
+    transform-style: preserve-3d;
+    will-change: transform;
+    transform-origin: center;
+  }
+  
+  .card img{ 
+    width:100%; 
+    height:100%; 
+    object-fit:cover; 
+    display:block; 
+    pointer-events: none;
+    user-drag: none;
+    -webkit-user-drag: none;
+    -webkit-user-select: none;
+  }
+
+  .pos1 { 
+    left: var(--gap-left-1); 
+    width: var(--outer-width); 
+    height: var(--outer-height); 
+    z-index:14; 
+    transform: translate(-50%,-50%) scale(var(--zoom-scale-1)); 
+    opacity:0.4; 
+    filter: blur(2px);
+    transition: all 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  
+  .pos2 { 
+    left: var(--gap-left-2); 
+    width: var(--near-width); 
+    height: var(--near-height); 
+    z-index:16; 
+    transform: translate(-50%,-50%) scale(var(--zoom-scale-2)); 
+    opacity:0.7; 
+    filter: blur(1px);
+    transition: all 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  
+  .pos3 { 
+    left: var(--gap-left-3); 
+    width: var(--center-width); 
+    height: var(--center-height); 
+    z-index:22; 
+    transform: translate(-50%,-50%) scale(var(--zoom-scale-3)); 
+    opacity:1; 
+    border-radius:20px; 
+    filter: blur(0px);
+    transition: all 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+  }
+  
+  .pos4 { 
+    left: var(--gap-left-4); 
+    width: var(--near-width); 
+    height: var(--near-height); 
+    z-index:16; 
+    transform: translate(-50%,-50%) scale(var(--zoom-scale-4)); 
+    opacity:0.7; 
+    filter: blur(1px);
+    transition: all 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  
+  .pos5 { 
+    left: var(--gap-left-5); 
+    width: var(--outer-width); 
+    height: var(--outer-height); 
+    z-index:14; 
+    transform: translate(-50%,-50%) scale(var(--zoom-scale-5)); 
+    opacity:0.4; 
+    filter: blur(2px);
+    transition: all 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  
+  .hidden { 
+    left:-20%; 
+    width:100px; 
+    height:100px; 
+    opacity:0; 
+    pointer-events:none; 
+    transform:translate(-50%,-50%) scale(0.4); 
+    z-index:0; 
+    filter: blur(3px);
+    transition: all 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  /* subtle hover shadow for active card */
+  .card.hover {
+    box-shadow: 0 40px 70px rgba(0,0,0,0.32);
+  }
+
+  @media (max-width:100%){
+    :root{
+      --center-width:320px;
+      --center-height:360px;
+      --near-width:140px;
+      --near-height:140px;
+      --outer-width:100px;
+      --outer-height:100px;
+    }
+  }
+  
+  @media (max-width:100%){
+    :root{
+      --center-width:940px;
+      --center-height:700px;
+      --near-width:100px;
+      --near-height:120px;
+      --outer-width:0px;
+      --outer-height:0px;
+    }
+    .pos1,.pos5{ display:none;}
+  }
+
+  /* small pointer cursor change while dragging */
+  .wrap.dragging { cursor: grabbing; }
+</style>
+</head>
+<body>
+  <!-- Radial Background Container -->
+  <div class="container" aria-hidden="true">
+    <div class="radial radial--big" id="radial-big"></div>
+    <div class="radial radial--mid mid-a" id="radial-mid-a"></div>
+    <div class="radial radial--mid mid-b" id="radial-mid-b"></div>
+  </div>
+
+  <!-- Card Carousel -->
+  <div class="wrap" id="wrap">
+    <div class="track" id="track">
+      <div class="card pos3" data-index="1"><img draggable="false" src="https://cdn.abacus.ai/images/33704204-dca9-449b-897f-935b59369270.png" alt=""></div>
+      <div class="card pos4" data-index="2"><img draggable="false" src="https://cdn.abacus.ai/images/33704204-dca9-449b-897f-935b59369270.png" alt=""></div>
+      <div class="card pos5" data-index="3"><img draggable="false" src="https://cdn.abacus.ai/images/33704204-dca9-449b-897f-935b59369270.png" alt=""></div>
+      <div class="card hidden" data-index="4"><img draggable="false" src="https://cdn.abacus.ai/images/33704204-dca9-449b-897f-935b59369270.png" alt=""></div>
+      <div class="card hidden" data-index="5"><img draggable="false" src="https://cdn.abacus.ai/images/33704204-dca9-449b-897f-935b59369270.png" alt=""></div>
+    </div>
+  </div>
+
+<script>
+  // --- DOM & state ---
+  const cards = Array.from(document.querySelectorAll('.card'));
+  const radialBig = document.getElementById('radial-big');
+  const radialMidA = document.getElementById('radial-mid-a');
+  const radialMidB = document.getElementById('radial-mid-b');
+  const wrap = document.getElementById('wrap');
+  const track = document.getElementById('track');
+
+  let currentCenterIndex = 1;
+
+  // wheel sensitivity variables
+  let wheelAccumulator = 0;
+  const WHEEL_THRESHOLD = 140; // larger => slower/less sensitive
+  let wheelResetTimer = null;
+
+  // pointer drag variables
+  let isDragging = false;
+  let pointerStartX = 0;
+  let pointerStartY = 0;
+  let pointerLastX = 0;
+  const DRAG_THRESHOLD = 80; // px required to trigger next/prev on release
+  const MAX_FEEDBACK = 180; // max px to visually move track while dragging
+
+  // pointer/tap detection
+  let pointerDownCard = null;
+  let pointerMovedSinceDown = false;
+  let lastTapTime = 0;
+
+  // mapping base scales for positions (keeps visual scale consistent with CSS)
+  const SCALE_MAP = {
+    pos1: 0.6,
+    pos2: 0.8,
+    pos3: 1.0,
+    pos4: 0.8,
+    pos5: 0.6,
+    hidden: 0.4
+  };
+
+  // --- palettes per index and per radial layer (same as before) ---
+  const palettes = {
+    1: {
+      big:  { c0:'#ff6b6b', c0alt:'#ff9b6b', c1:'#1b1b2f', c1alt:'#0f1724' },
+      midA: { c0:'#ffcc66', c0alt:'#ff9966', c1:'#444444', c1alt:'#222222' },
+      midB: { c0:'#ffffff', c0alt:'#e6e6e6', c1:'#000000', c1alt:'#222222' }
+    },
+    2: {
+      big:  { c0:'#6bf0ff', c0alt:'#6bb9ff', c1:'#07132a', c1alt:'#001827' },
+      midA: { c0:'#88ffcc', c0alt:'#66ffaa', c1:'#072a1a', c1alt:'#00120a' },
+      midB: { c0:'#a6e0ff', c0alt:'#8acbff', c1:'#001827', c1alt:'#00101a' }
+    },
+    3: {
+      big:  { c0:'#ffd86b', c0alt:'#ffb86b', c1:'#2b1b0f', c1alt:'#130b05' },
+      midA: { c0:'#fff2cc', c0alt:'#ffe0a3', c1:'#20150c', c1alt:'#120a04' },
+      midB: { c0:'#ffe6b3', c0alt:'#ffd1a3', c1:'#2a1f15', c1alt:'#130b07' }
+    },
+    4: {
+      big:  { c0:'#a56bff', c0alt:'#d09bff', c1:'#07121a', c1alt:'#000814' },
+      midA: { c0:'#c6a3ff', c0alt:'#e6ccff', c1:'#071227', c1alt:'#000816' },
+      midB: { c0:'#f0e6ff', c0alt:'#e6d9ff', c1:'#050214', c1alt:'#00030a' }
+    },
+    5: {
+      big:  { c0:'#6bff98', c0alt:'#6bffcc', c1:'#052214', c1alt:'#00110a' },
+      midA: { c0:'#bfffe0', c0alt:'#9bffd6', c1:'#071f12', c1alt:'#001104' },
+      midB: { c0:'#e6fff0', c0alt:'#ccffeb', c1:'#02120a', c1alt:'#000a06' }
+    }
+  };
+
+  function applyPaletteForIndex(idx) {
+    const p = palettes[idx] || palettes[1];
+    applyToRadial(radialBig, p.big);
+    applyToRadial(radialMidA, p.midA);
+    applyToRadial(radialMidB, p.midB);
+    [radialBig, radialMidA, radialMidB].forEach(r => {
+      r.style.animation = 'none';
+      void r.offsetWidth;
+      r.style.animation = '';
+    });
+  }
+  function applyToRadial(r, values) {
+    r.style.setProperty('--c0-start', values.c0);
+    r.style.setProperty('--c0-alt', values.c0alt);
+    r.style.setProperty('--c1-start', values.c1);
+    r.style.setProperty('--c1-alt', values.c1alt);
+    r.style.setProperty('--color-0', values.c0);
+    r.style.setProperty('--color-1', values.c1);
+  }
+
+  // --- card positioning logic ---
+  function setByIndex(idx, cls) {
+    const el = cards.find(c => Number(c.dataset.index) === idx);
+    if (!el) return;
+    el.className = 'card ' + cls;
+  }
+
+  function updatePositions(centerIdx) {
+    centerIdx = Math.max(1, Math.min(5, centerIdx));
+    cards.forEach(c => c.className = 'card hidden');
+
+    if (centerIdx===1) { setByIndex(1,'pos3'); setByIndex(2,'pos4'); setByIndex(3,'pos5'); }
+    else if (centerIdx===2) { setByIndex(1,'pos2'); setByIndex(2,'pos3'); setByIndex(3,'pos4'); setByIndex(4,'pos5'); }
+    else if (centerIdx===3) { setByIndex(1,'pos1'); setByIndex(2,'pos2'); setByIndex(3,'pos3'); setByIndex(4,'pos4'); setByIndex(5,'pos5'); }
+    else if (centerIdx===4) { setByIndex(2,'pos1'); setByIndex(3,'pos2'); setByIndex(4,'pos3'); setByIndex(5,'pos4'); }
+    else if (centerIdx===5) { setByIndex(3,'pos1'); setByIndex(4,'pos2'); setByIndex(5,'pos3'); }
+
+    applyPaletteForIndex(centerIdx);
+
+    // ensure any visual drag transform is reset smoothly
+    track.style.transition = 'transform 420ms cubic-bezier(.22,.9,.23,1)';
+    track.style.transform = 'translateX(0px)';
+
+    // clear inline transforms from cards so CSS class transforms apply (reset hover state)
+    cards.forEach(c => {
+      c.style.transition = ''; // revert to CSS transition
+      c.classList.remove('hover');
+      c.style.transform = ''; // remove inline transform - classes define scale/translate
+    });
+  }
+
+  // clicking on cards (kept for mouse-only clicks; debounced by lastTapTime)
+  cards.forEach(c => c.addEventListener('click', (ev) => {
+    // ignore if this click was already handled by pointerup tap logic
+    if (Date.now() - lastTapTime < 150) return;
+    if (c.classList.contains('hidden')) return;
+    const idx = Number(c.dataset.index);
+    currentCenterIndex = idx;
+    updatePositions(currentCenterIndex);
+  }));
+
+  // keyboard
+  window.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft') {
+      currentCenterIndex = Math.max(1, currentCenterIndex - 1);
+      updatePositions(currentCenterIndex);
+    } else if (e.key === 'ArrowRight') {
+      currentCenterIndex = Math.min(5, currentCenterIndex + 1);
+      updatePositions(currentCenterIndex);
+    }
+  });
+
+  // --- wheel -> accumulate then trigger when threshold reached (slower scroll) ---
+  wrap.addEventListener('wheel', e => {
+    // prevent page scroll while over carousel
+    e.preventDefault();
+
+    // Use deltaY primarily; if horizontal wheel, use deltaX
+    const delta = Math.sign(e.deltaY || e.deltaX) * Math.abs(e.deltaY || e.deltaX);
+
+    wheelAccumulator += delta;
+
+    // decay accumulator slowly after inactivity
+    if (wheelResetTimer) clearTimeout(wheelResetTimer);
+    wheelResetTimer = setTimeout(() => { wheelAccumulator = 0; }, 240);
+
+    if (Math.abs(wheelAccumulator) >= WHEEL_THRESHOLD) {
+      if (wheelAccumulator > 0) {
+        currentCenterIndex = Math.min(5, currentCenterIndex + 1);
+      } else {
+        currentCenterIndex = Math.max(1, currentCenterIndex - 1);
+      }
+      updatePositions(currentCenterIndex);
+      wheelAccumulator = 0;
+    }
+  }, { passive: false });
+
+  // --- pointer drag (desktop + touch) ---
+  function onPointerDown(e) {
+    // Only handle primary button / single touch
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    isDragging = true;
+    wrap.classList.add('dragging');
+    pointerStartX = e.clientX;
+    pointerStartY = e.clientY;
+    pointerLastX = pointerStartX;
+    pointerMovedSinceDown = false;
+    // store the card that was under pointer when started (if any)
+    pointerDownCard = e.target.closest('.card');
+    // stop track transition for immediate feedback
+    track.style.transition = 'none';
+    // capture pointer to continue receiving moves outside element
+    wrap.setPointerCapture && wrap.setPointerCapture(e.pointerId);
+  }
+
+  function onPointerMove(e) {
+    if (!isDragging) return;
+    const dx = e.clientX - pointerStartX;
+    // mark as moved if beyond small tolerance (tap vs drag)
+    if (Math.abs(dx) > 6) pointerMovedSinceDown = true;
+    // limit feedback so it doesn't fly off screen
+    const limited = Math.max(-MAX_FEEDBACK, Math.min(MAX_FEEDBACK, dx));
+    track.style.transform = `translateX(${limited}px)`;
+    pointerLastX = e.clientX;
+  }
+
+  function onPointerUp(e) {
+    if (!isDragging) return;
+    isDragging = false;
+    wrap.classList.remove('dragging');
+    // release pointer capture if available
+    try { wrap.releasePointerCapture && wrap.releasePointerCapture(e.pointerId); } catch(_) {}
+    // re-enable transition for snap
+    track.style.transition = 'transform 420ms cubic-bezier(.22,.9,.23,1)';
+    const totalDx = pointerLastX - pointerStartX;
+
+    // If this was a tap (no meaningful move), treat it as a click/tap on the card
+    if (!pointerMovedSinceDown) {
+      const tappedCard = pointerDownCard;
+      if (tappedCard && !tappedCard.classList.contains('hidden')) {
+        const idx = Number(tappedCard.dataset.index);
+        currentCenterIndex = idx;
+        updatePositions(currentCenterIndex);
+        lastTapTime = Date.now();
+      } else {
+        // small tap but not on a card -> just snap back
+        track.style.transform = 'translateX(0px)';
+      }
+    } else {
+      // It was a drag — handle swipe thresholds
+      if (totalDx <= -DRAG_THRESHOLD) {
+        // swiped left => next
+        currentCenterIndex = Math.min(5, currentCenterIndex + 1);
+        updatePositions(currentCenterIndex);
+      } else if (totalDx >= DRAG_THRESHOLD) {
+        // swiped right => prev
+        currentCenterIndex = Math.max(1, currentCenterIndex - 1);
+        updatePositions(currentCenterIndex);
+      } else {
+        // not enough movement => snap back
+        track.style.transform = 'translateX(0px)';
+      }
+    }
+
+    // clear pointer-down tracking
+    pointerDownCard = null;
+    pointerMovedSinceDown = false;
+  }
+
+  // attach pointer handlers (pointer events work for touch + pen + mouse)
+  wrap.addEventListener('pointerdown', onPointerDown, { passive: true });
+  window.addEventListener('pointermove', onPointerMove, { passive: true });
+  window.addEventListener('pointerup', onPointerUp, { passive: true });
+  window.addEventListener('pointercancel', onPointerUp, { passive: true });
+
+  // Prevent native drag of images
+  document.querySelectorAll('img').forEach(img => {
+    img.addEventListener('dragstart', e => e.preventDefault());
+  });
+
+  // --- Hover tilt implementation ---
+  // Max rotation per position (center larger)
+  const BASE_MAX = { pos1: {x: 8, y: 12}, pos2: {x: 9, y: 14}, pos3: {x: 12, y: 18}, pos4: {x: 9, y: 14}, pos5: {x: 8, y: 12}, hidden: {x:6, y:8} };
+
+  function getPosClass(card) {
+    const cl = card.className.split(' ').find(c => c.startsWith('pos') || c === 'hidden');
+    return cl || 'hidden';
+  }
+
+  function applyCardTilt(card, clientX, clientY) {
+    if (!card || card.classList.contains('hidden')) return;
+    if (isDragging) return; // don't tilt while dragging
+    const rect = card.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = (clientX - cx) / (rect.width / 2); // -1..1
+    const dy = (clientY - cy) / (rect.height / 2); // -1..1
+    const pos = getPosClass(card);
+    const max = BASE_MAX[pos] || BASE_MAX.pos3;
+    // rotateX: top hover -> positive rotation (top comes forward)
+    const rotateX = clamp(-dy * max.x, -max.x, max.x);
+    const rotateY = clamp(dx * max.y, -max.y, max.y);
+    const baseScale = SCALE_MAP[pos] || 1;
+    // small translateZ depending on intensity
+    const intensity = Math.min(1, Math.max(Math.abs(dx), Math.abs(dy)));
+    const tz = 12 * intensity * baseScale; // up to ~12px
+    card.classList.add('hover');
+    // inline transform overrides class transform, so include translate/scale from class
+    card.style.transform = `translate(-50%,-50%) scale(${baseScale}) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(${tz}px)`;
+    // smooth immediate transitions
+    card.style.transition = 'transform 120ms cubic-bezier(.22,.9,.23,1), box-shadow 120ms';
+  }
+
+  function resetCardTilt(card) {
+    if (!card) return;
+    // Remove hover class and inline transform so CSS class transform applies
+    card.classList.remove('hover');
+    // let CSS transition handle smooth reset
+    card.style.transition = ''; // revert to default CSS transition
+    card.style.transform = ''; // removes inline transform; CSS handles scale/translate
+  }
+
+  // helper
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+  // attach pointer enter/move/leave to each card
+  cards.forEach(card => {
+    card.addEventListener('pointerenter', (e) => {
+      // ignore if hidden
+      if (card.classList.contains('hidden')) return;
+      // apply a quick tilt based on current pointer
+      applyCardTilt(card, e.clientX, e.clientY);
+    }, { passive: true });
+
+    card.addEventListener('pointermove', (e) => {
+      // if user is dragging/swiping we should not apply tilt
+      if (isDragging) return;
+      if (card.classList.contains('hidden')) return;
+      applyCardTilt(card, e.clientX, e.clientY);
+    }, { passive: true });
+
+    card.addEventListener('pointerleave', (e) => {
+      resetCardTilt(card);
+    }, { passive: true });
+
+    // For touch/pointerup outside wrap, also reset tilt
+    card.addEventListener('pointerup', (e) => {
+      resetCardTilt(card);
+    }, { passive: true });
+  });
+
+  // ensure we clear tilt if pointer leaves the wrap entirely
+  wrap.addEventListener('pointerleave', () => {
+    cards.forEach(c => resetCardTilt(c));
+  }, { passive: true });
+
+  // initial placement + palette
+  updatePositions(currentCenterIndex);
+
+  // Accessibility: focus so keyboard arrows work on wrap
+  wrap.setAttribute('tabindex', '0');
+
+  // Expose next/prev functions if needed
+  function next() { currentCenterIndex = Math.min(5, currentCenterIndex + 1); updatePositions(currentCenterIndex); }
+  function prev() { currentCenterIndex = Math.max(1, currentCenterIndex - 1); updatePositions(currentCenterIndex); }
+
+  // Optional: you can tweak constants at top:
+  // WHEEL_THRESHOLD (bigger => slower wheel), DRAG_THRESHOLD (px to trigger navigation), MAX_FEEDBACK (drag visual limit)
+</script>
+</body>
+</html>
+
